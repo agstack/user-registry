@@ -153,16 +153,16 @@
             this.destinationListHTML = document.createElement("div");
 
             var defaults = {
-            element:
-                typeof selector === "object"
-                ? selector
-                : document.querySelector(selector),
-            originList: [],
-            destinationList: [],
+                element:
+                    typeof selector === "object"
+                    ? selector
+                    : document.querySelector(selector),
+                originList: [],
+                destinationList: [],
             };
 
             if (arguments[0] && typeof arguments[1] === "object") {
-            this.options = extendDefaults(defaults, arguments[1]);
+                this.options = extendDefaults(defaults, arguments[1]);
             }
         };
 
@@ -205,7 +205,7 @@
             self.originListHTML.addEventListener(
                 "click",
                 function () {
-                swapItemDOM.call(self, event.target, self.destinationListHTML);
+                    swapItemDOM.call(self, event.target, self.destinationListHTML);
                 },
                 false
             );
@@ -213,7 +213,7 @@
             self.destinationListHTML.addEventListener(
                 "click",
                 function () {
-                swapItemDOM.call(self, event.target, self.originListHTML);
+                    swapItemDOM.call(self, event.target, self.originListHTML, true);
                 },
                 false
             );
@@ -221,31 +221,31 @@
             self.options.element.addEventListener(
                 "keyup",
                 function () {
-                var key = event.keyCode || event.charCode;
+                    var key = event.keyCode || event.charCode;
 
-                switch (key) {
-                    case 40:
-                    if (self.originListHTML.childNodes.length > 0) {
-                        selectionDown.call(self);
-                        scrollTop.call(self);
+                    switch (key) {
+                        case 40:
+                            if (self.originListHTML.childNodes.length > 0) {
+                                selectionDown.call(self);
+                                scrollTop.call(self);
+                            }
+                        break;
+
+                        case 38:
+                            if (self.originListHTML.childNodes.length > 0) {
+                                selectionUp.call(self);
+                                scrollBottom.call(self);
+                            }
+                        break;
+
+                        case 13:
+                            selectItemOriginList.call(self);
+                        break;
+
+                        default:
+                            filterOriginList.call(self);
+                        break;
                     }
-                    break;
-
-                    case 38:
-                    if (self.originListHTML.childNodes.length > 0) {
-                        selectionUp.call(self);
-                        scrollBottom.call(self);
-                    }
-                    break;
-
-                    case 13:
-                    selectItemOriginList.call(self);
-                    break;
-
-                    default:
-                    filterOriginList.call(self);
-                    break;
-                }
                 },
                 false
             );
@@ -253,7 +253,7 @@
             self.options.element.addEventListener(
                 "keydown",
                 function () {
-                captureEmpty.call(self);
+                    captureEmpty.call(self);
                 },
                 false
             );
@@ -261,40 +261,49 @@
             window.addEventListener(
                 "click",
                 function () {
-                closeOriginList.call(self);
+                    closeOriginList.call(self);
                 },
                 false
             );
             }
         }
 
-        function swapItemDOM(trigger, list) {
+        function swapItemDOM(trigger, list, isRemove) {
             var self = this;
             var item;
             if (!trigger) return;
 
             item = trigger.classList.contains("sellect-trigger")
-            ? trigger
-            : trigger.parentNode;
+                ? trigger
+                : trigger.parentNode;
 
             event.stopPropagation();
 
             if (
-            !item ||
-            item.className.indexOf("sellected-list") > -1 ||
-            item.className.indexOf("sellect-list") > -1
+                !item ||
+                item.className.indexOf("sellected-list") > -1 ||
+                item.className.indexOf("sellect-list") > -1
             ) {
-            return;
+                return;
             }
 
-            item.parentNode.removeChild(item);
-            list.appendChild(item);
-            item.classList.remove("active");
+            if (isRemove) {
+                item.parentNode.removeChild(item);
+            }
+            const selectedTag = self.options.element.value
+            const span = document.createElement("span")
+            span.style = { padding: "0 5px 2px" }
+            span.innerHTML = selectedTag.substring(0, selectedTag.lastIndexOf("#"))
 
+            list.appendChild(span);
+            list.appendChild(item.cloneNode(true));
+
+            item.classList.remove("active");
+ 
             self.options.element.value = "";
             self.options.element.focus();
             createEventListener.call(self, "keyup");
-
+            
             self.options.originList = [];
             self.options.destinationList = [];
 
@@ -311,21 +320,22 @@
             var value = event.target.value;
             var items = self.originListHTML.childNodes;
 
-            if (value.length && value[0] === "#") {
-            const substr = value.substring(1, value.length);
-            if (substr.length) {
-                openOriginList.call(self);
-            }
+            if (value.includes("#")) {
+                const substr = value.substring(value.lastIndexOf("#") + 1, value.length);
 
-            items.forEach(function (item) {
-                if (item.innerText.toLowerCase().startsWith(substr.toLowerCase())) {
-                item.style.display = "inherit";
-                } else {
-                item.style.display = "none";
+                if (substr.length) {
+                    openOriginList.call(self);
                 }
-            });
+
+                items.forEach(function (item) {
+                    if (item.innerText.toLowerCase().startsWith(substr.toLowerCase())) {
+                        item.style.display = "inherit";
+                    } else {
+                        item.style.display = "none";
+                    }
+                });
             } else {
-            closeOriginList.call(self);
+                closeOriginList.call(self);
             }
         }
 
@@ -356,8 +366,8 @@
             prevItem = getOriginListVisibleItem(selectedItem.previousElementSibling);
 
             if (prevItem) {
-            prevItem.classList.add("active");
-            selectedItem.classList.remove("active");
+                prevItem.classList.add("active");
+                selectedItem.classList.remove("active");
             }
         }
 
@@ -367,28 +377,28 @@
             var nextItem;
 
             if (!selectedItem) {
-            nextItem = getOriginListVisibleItem(
-                self.originListHTML.childNodes[0],
-                "down"
-            );
+                nextItem = getOriginListVisibleItem(
+                    self.originListHTML.childNodes[0],
+                    "down"
+                );
 
-            if (nextItem) {
-                nextItem.classList.add("active");
-            }
+                if (nextItem) {
+                    nextItem.classList.add("active");
+                }
 
-            return;
+                return;
             }
 
             if (!selectedItem.nextElementSibling) return;
 
             nextItem = getOriginListVisibleItem(
-            selectedItem.nextElementSibling,
-            "down"
+                selectedItem.nextElementSibling,
+                "down"
             );
 
             if (nextItem) {
-            nextItem.classList.add("active");
-            selectedItem.classList.remove("active");
+                nextItem.classList.add("active");
+                selectedItem.classList.remove("active");
             }
         }
 
@@ -419,14 +429,14 @@
             var itemPositionTop = selectedItem.offsetTop;
 
             if (
-            itemPositionTop <=
-            self.originListHTML.scrollHeight -
-                self.originListHTML.clientHeight +
-                selectedItem.clientHeight
+                itemPositionTop <=
+                self.originListHTML.scrollHeight -
+                    self.originListHTML.clientHeight +
+                    selectedItem.clientHeight
             ) {
-            self.originListHTML.scrollTop =
-                self.originListHTML.scrollTop - selectedItem.clientHeight;
-            return true;
+                self.originListHTML.scrollTop =
+                    self.originListHTML.scrollTop - selectedItem.clientHeight;
+                return true;
             }
         }
 
@@ -470,8 +480,8 @@
             event.stopPropagation();
 
             if (!self.originListHTML.classList.contains("open")) {
-            self.options.element.focus();
-            self.originListHTML.classList.add("open");
+                self.options.element.focus();
+                self.originListHTML.classList.add("open");
             }
         }
 
@@ -480,7 +490,7 @@
             event.stopPropagation();
 
             if (self.originListHTML.classList.contains("open")) {
-            self.originListHTML.classList.remove("open");
+                self.originListHTML.classList.remove("open");
             }
         }
 
@@ -489,18 +499,18 @@
             event.stopPropagation();
 
             if (!self.originListHTML.classList.contains("open")) {
-            self.originListHTML.classList.add("open");
+                self.originListHTML.classList.add("open");
             } else {
-            self.originListHTML.classList.remove("open");
+                self.originListHTML.classList.remove("open");
             }
         }
 
         function extendDefaults(source, properties) {
             var property;
             for (property in properties) {
-            if (properties.hasOwnProperty(property)) {
-                source[property] = properties[property];
-            }
+                if (properties.hasOwnProperty(property)) {
+                    source[property] = properties[property];
+                }
             }
             return source;
         }
@@ -509,35 +519,59 @@
             var self = this;
 
             if (self.options) {
-            self.options.destinationList.forEach(function (itemOuter) {
-                self.options.originList = self.options.originList.filter(function (
-                itemInner
-                ) {
-                return itemInner !== itemOuter;
+                self.options.destinationList.forEach(function (itemOuter) {
+                    self.options.originList = self.options.originList.filter(function (
+                    itemInner
+                    ) {
+                        return itemInner !== itemOuter;
+                    });
                 });
-            });
 
-            self.options.element.setAttribute("class", "sellect-element");
-            self.container.setAttribute("class", "sellect-container");
-            self.originListHTML.setAttribute("class", "sellect-origin-list");
-            self.destinationListHTML.setAttribute(
-                "class",
-                "sellect-destination-list"
-            );
+                self.options.element.setAttribute("class", "sellect-element");
+                self.container.setAttribute("class", "sellect-container");
+                self.originListHTML.setAttribute("class", "sellect-origin-list");
+                self.destinationListHTML.setAttribute(
+                    "class",
+                    "sellect-destination-list"
+                );
             }
 
             createHTML.call(self);
             initializeEvents.call(self);
         };
 
+        _Sellect.prototype.clear = function () {
+            var self = this;
+            self.destinationListHTML.innerHTML = ""
+            self.options.destinationList = [];
+
+        }
+        _Sellect.prototype.getMessage = function () {
+            var self = this;
+            let message = ""
+
+            for (var i = 0; i < self.destinationListHTML.childNodes.length; i++) {
+                const item = self.destinationListHTML.childNodes[i] 
+                if (item.className.includes("sellect-trigger")) {
+                    message += " #" + item.textContent.replace(/^\s+|\s+$/gm,'')
+                } else {
+                    message += " " + item.textContent.replace(/^\s+|\s+$/gm,'')
+                }
+            }
+
+            return message ? message.trim() : self.options.element.value.replace(/^\s+|\s+$/gm,'').trim();
+        }
+
         _Sellect.prototype.getSelected = function () {
             var self = this;
             self.options.destinationList = [];
 
             for (var i = 0; i < self.destinationListHTML.childNodes.length; i++) {
-            self.options.destinationList.push(
-                self.destinationListHTML.childNodes[i].textContent
-            );
+                const item = self.destinationListHTML.childNodes[i] 
+                
+                if (item.className.includes("sellect-trigger")) {
+                    self.options.destinationList.push(item.textContent);
+                }
             }
 
             return self.options.destinationList;
@@ -577,11 +611,11 @@
         })
     } 
 
-    const predictiveOptions = [{"tag": "Alfalfa"},{"tag": "Almond"},{"tag": "Apple"}]
+    const predictiveOptions = [{"tag": "Alfalfa"},{"tag": "Almond"},{"tag": "Apple"}, {"tag": "Alpha"}]
     const mySellect = sellect("#chat-message-input", {
-        originList: predictiveOptions.map(opt => opt.tag),
-        destinationList: [predictiveOptions[0].tag]
+        originList: predictiveOptions.map(opt => opt.tag)
     });
+
     mySellect.init();
 
     chatSocket.onmessage = function(e) {
@@ -607,24 +641,21 @@
     };
 
     document.querySelector('#chat-message-submit').onclick = async function(e) {
-        const messageInputDom = document.querySelector('#chat-message-input');
         const file = document.getElementById("uploadFile").files[0];
-        const message = messageInputDom.value;
+        const message = mySellect.getMessage();
 
         const payload = {
             'message': message,
             'roomName': roomName
         }
-
-        // get selected options
-        console.log(mySellect.getSelected())
+  
         if (file) {
             const fileInBase64 = await toBase64(file)
             payload.file = fileInBase64;
         }
 
         chatSocket.send(JSON.stringify(payload));
-        messageInputDom.value = '';
+        mySellect.clear()
     };
 </script>
 </html>
