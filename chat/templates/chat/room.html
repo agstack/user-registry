@@ -559,7 +559,10 @@
                 }
             }
 
-            return message ? message.trim() : self.options.element.value.replace(/^\s+|\s+$/gm,'').trim();
+            message = message.trim() 
+            const inputValue = self.options.element.value.replace(/^\s+|\s+$/gm,'').trim()
+
+            return message ? `${message} ${inputValue}` : inputValue
         }
 
         _Sellect.prototype.getSelected = function () {
