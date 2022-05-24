@@ -86,6 +86,7 @@
         height: 18px;
         background: none;
         outline: none;
+        width: 100%;
     }
 
     .sellect-container{
@@ -94,20 +95,6 @@
         border-radius: 3px;
         margin-top: 5px;
         position: relative;
-    }
-
-    .sellect-destination-list{
-        display: inline-block;
-    }
-
-    .sellect-destination-list .sellect-item{
-        margin: 0 5px 5px 0;
-        background-color: #e5e5e5;
-        border: 1px solid #ccc;
-        cursor: pointer;
-        border-radius: 2px;
-        padding: 0 5px 2px;
-        display: inline-block;
     }
 
     .sellect-origin-list{
@@ -150,7 +137,6 @@
         this._Sellect = function (selector, options) {
             this.container = document.createElement("div");
             this.originListHTML = document.createElement("div");
-            this.destinationListHTML = document.createElement("div");
 
             var defaults = {
                 element:
@@ -170,22 +156,17 @@
             var self = this;
 
             if (self.options) {
-            self.options.originList.forEach(function (item) {
-                createListsHTML(self.originListHTML, item);
-            });
+                self.options.originList.forEach(function (item) {
+                    createListsHTML(self.originListHTML, item);
+                });
 
-            self.options.destinationList.forEach(function (item) {
-                createListsHTML(self.destinationListHTML, item);
-            });
+                self.options.element.parentNode.insertBefore(
+                    self.container,
+                    self.options.element
+                );
 
-            self.options.element.parentNode.insertBefore(
-                self.container,
-                self.options.element
-            );
-
-            self.container.appendChild(self.destinationListHTML);
-            self.container.appendChild(self.options.element);
-            self.container.appendChild(self.originListHTML);
+                self.container.appendChild(self.options.element);
+                self.container.appendChild(self.originListHTML);
             }
         }
 
@@ -205,15 +186,7 @@
             self.originListHTML.addEventListener(
                 "click",
                 function () {
-                    swapItemDOM.call(self, event.target, self.destinationListHTML);
-                },
-                false
-            );
-
-            self.destinationListHTML.addEventListener(
-                "click",
-                function () {
-                    swapItemDOM.call(self, event.target, self.originListHTML, true);
+                    addItemDOM.call(self, event.target);
                 },
                 false
             );
@@ -222,7 +195,6 @@
                 "keyup",
                 function () {
                     var key = event.keyCode || event.charCode;
-
                     switch (key) {
                         case 40:
                             if (self.originListHTML.childNodes.length > 0) {
@@ -237,23 +209,13 @@
                                 scrollBottom.call(self);
                             }
                         break;
-
                         case 13:
-                            selectItemOriginList.call(self);
+                            selectItemOriginList.call(self)
                         break;
-
                         default:
                             filterOriginList.call(self);
                         break;
                     }
-                },
-                false
-            );
-
-            self.options.element.addEventListener(
-                "keydown",
-                function () {
-                    captureEmpty.call(self);
                 },
                 false
             );
@@ -268,7 +230,16 @@
             }
         }
 
-        function swapItemDOM(trigger, list, isRemove) {
+
+        function selectItemOriginList() {
+            var self = this;
+
+            var selectedItem = self.originListHTML.getElementsByClassName("active")[0];
+        
+            addItemDOM.call(self, selectedItem);
+        }
+
+        function addItemDOM(trigger) {
             var self = this;
             var item;
             if (!trigger) return;
@@ -278,7 +249,7 @@
                 : trigger.parentNode;
 
             event.stopPropagation();
-
+        
             if (
                 !item ||
                 item.className.indexOf("sellected-list") > -1 ||
@@ -287,41 +258,37 @@
                 return;
             }
 
-            if (isRemove) {
-                item.parentNode.removeChild(item);
-            }
-            const selectedTag = self.options.element.value
-            const span = document.createElement("span")
-            span.style = { padding: "0 5px 2px" }
-            span.innerHTML = selectedTag.substring(0, selectedTag.lastIndexOf("#"))
+            var inputText = self.options.element.value
+            var selectionStart = self.options.element.selectionStart
+            
+            var beforeSearchedTag = inputText.substring(0, inputText.substring(0, selectionStart).lastIndexOf(" ")) 
+            var afterSearchedTag = inputText.substring(selectionStart, inputText.length)
 
-            list.appendChild(span);
-            list.appendChild(item.cloneNode(true));
+            var modBeforeSearchedTag = beforeSearchedTag.length ? beforeSearchedTag + " " : ""
+            var modAfterSearchedTag = afterSearchedTag.length ? afterSearchedTag : " "
 
-            item.classList.remove("active");
- 
-            self.options.element.value = "";
+            var resultText = modBeforeSearchedTag + "#" + item.innerText + modAfterSearchedTag
+           
+            self.options.element.value = resultText
+
             self.options.element.focus();
             createEventListener.call(self, "keyup");
-            
+
             self.options.originList = [];
-            self.options.destinationList = [];
-
-            self.options.originList = self.getUnselected();
-            self.options.destinationList = self.getSelected();
-
-            if (self.options.onInsert) self.options.onInsert(event, item);
-
-            if (self.options.onRemove) self.options.onRemove(event, item);
         }
 
         function filterOriginList() {
             var self = this;
             var value = event.target.value;
+            var selectionStart = event.target.selectionStart
             var items = self.originListHTML.childNodes;
 
-            if (value.includes("#")) {
-                const substr = value.substring(value.lastIndexOf("#") + 1, value.length);
+            var startIndex = value.substr(0, selectionStart).lastIndexOf("#")
+            var selectedPart = value.substring(startIndex, selectionStart)
+            var selectedTag = selectedPart.includes(" ") ? "" : selectedPart
+            
+            if (selectedTag) {
+                var substr = selectedTag.replace("#", "")
 
                 if (substr.length) {
                     openOriginList.call(self);
@@ -336,21 +303,6 @@
                 });
             } else {
                 closeOriginList.call(self);
-            }
-        }
-
-        function captureEmpty() {
-            var self = this;
-            var key = event.keyCode || event.charCode;
-            var string = event.target.value;
-
-            if (
-            key === 8 &&
-            string === "" &&
-            self.destinationListHTML.childNodes.length > 0
-            ) {
-            var lastItem = self.destinationListHTML.lastElementChild;
-            lastItem.click();
             }
         }
 
@@ -459,15 +411,7 @@
 
             return selectCandidate.offsetParent !== null ? selectCandidate : false;
         }
-
-        function selectItemOriginList() {
-            var self = this;
-
-            var selectedItem = self.originListHTML.getElementsByClassName("active")[0];
-
-            swapItemDOM.call(self, selectedItem, self.destinationListHTML);
-        }
-
+        
         function createEventListener(eventType) {
             var self = this;
             var customEvent = document.createEvent("Event");
@@ -519,21 +463,10 @@
             var self = this;
 
             if (self.options) {
-                self.options.destinationList.forEach(function (itemOuter) {
-                    self.options.originList = self.options.originList.filter(function (
-                    itemInner
-                    ) {
-                        return itemInner !== itemOuter;
-                    });
-                });
-
                 self.options.element.setAttribute("class", "sellect-element");
                 self.container.setAttribute("class", "sellect-container");
                 self.originListHTML.setAttribute("class", "sellect-origin-list");
-                self.destinationListHTML.setAttribute(
-                    "class",
-                    "sellect-destination-list"
-                );
+              
             }
 
             createHTML.call(self);
@@ -542,56 +475,14 @@
 
         _Sellect.prototype.clear = function () {
             var self = this;
-            self.destinationListHTML.innerHTML = ""
-            self.options.destinationList = [];
-
+            self.options.element.value = ""
         }
+    
         _Sellect.prototype.getMessage = function () {
             var self = this;
-            let message = ""
 
-            for (var i = 0; i < self.destinationListHTML.childNodes.length; i++) {
-                const item = self.destinationListHTML.childNodes[i] 
-                if (item.className.includes("sellect-trigger")) {
-                    message += " #" + item.textContent.replace(/^\s+|\s+$/gm,'')
-                } else {
-                    message += " " + item.textContent.replace(/^\s+|\s+$/gm,'')
-                }
-            }
-
-            message = message.trim() 
-            const inputValue = self.options.element.value.replace(/^\s+|\s+$/gm,'').trim()
-
-            return message ? `${message} ${inputValue}` : inputValue
+            return self.options.element.value
         }
-
-        _Sellect.prototype.getSelected = function () {
-            var self = this;
-            self.options.destinationList = [];
-
-            for (var i = 0; i < self.destinationListHTML.childNodes.length; i++) {
-                const item = self.destinationListHTML.childNodes[i] 
-                
-                if (item.className.includes("sellect-trigger")) {
-                    self.options.destinationList.push(item.textContent);
-                }
-            }
-
-            return self.options.destinationList;
-        };
-
-        _Sellect.prototype.getUnselected = function () {
-            var self = this;
-            self.options.originList = [];
-
-            for (var i = 0; i < self.originListHTML.childNodes.length; i++) {
-            self.options.originList.push(
-                self.originListHTML.childNodes[i].textContent
-            );
-            }
-
-            return self.options.originList;
-        };
     })();
 </script>
 <script>
