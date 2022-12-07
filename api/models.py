@@ -11,11 +11,13 @@ class User(db.Model):
     phone_num = db.Column(db.String())
     email = db.Column(db.String())
     password = db.Column(db.String())
+    discoverable = db.Column(db.Boolean())
 
     def __init__(self, phone_num, email, password):
         self.phone_num = phone_num
         self.email = email
         self.password = password
+        self.discoverable = True  # default value True
 
     def __repr__(self):
         return '<id {}>'.format(self.id)
