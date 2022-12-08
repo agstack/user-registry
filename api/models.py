@@ -37,6 +37,6 @@ class User(db.Model):
             except:
                 return jsonify({'message': 'token is invalid'})
 
-            return f(current_user, *args, **kwargs)
+            return f(*args, **kwargs)
 
         return decorator

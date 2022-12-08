@@ -26,7 +26,7 @@ def hello_world():
 # this route sends back list of users
 @app.route('/user', methods=['GET'])
 @User.token_required
-def get_all_users(current_user):
+def get_all_users():
     # querying the database
     # for all the entries in it
     users = User.query.all()
@@ -119,8 +119,9 @@ def signup():
         return make_response('User already exists. Please Log in.', 202)
 
 
-# route to uodate the user
+# route to update the user
 @app.route('/user/<user_id>', methods=['POST'])
+@User.token_required
 def update(user_id):
     body = request.get_json(force=True)
     user = User.query.get(user_id)
