@@ -38,7 +38,8 @@ def get_all_users(current_user):
         # to the response list
         output.append({
             'id': user.id,
-            'email': user.email
+            'email': user.email,
+            'phone_num': user.phone_num
         })
 
     return jsonify({'users': output})
@@ -76,7 +77,7 @@ def login():
             'id': user.id,
             'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
         }, app.config['SECRET_KEY'], algorithm="HS256")
-        return make_response(jsonify({'token': token}), 201)
+        return make_response(jsonify({'token': token}), 200)
     # returns 403 if password is wrong
     return make_response(
         'Could not verify',
@@ -111,10 +112,24 @@ def signup():
         db.session.add(user)
         db.session.commit()
 
-        return make_response('Successfully registered.', 201)
+        return make_response('Successfully registered.', 200)
     else:
         # returns 202 if user already exists
         return make_response('User already exists. Please Log in.', 202)
+
+
+# route to uodate the user
+@app.route('/user/<user_id>', methods=['POST'])
+def update(user_id):
+    body = request.get_json(force=True)
+    user = User.query.get(user_id)
+    if not user:
+        return make_response('User not found.', 400)
+    for key, value in body.items():
+        setattr(user, key, value)
+    db.session.commit()
+
+    return make_response('User updated successfully.', 200)
 
 
 if __name__ == '__main__':
