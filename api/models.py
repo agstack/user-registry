@@ -1,6 +1,8 @@
 from flask import jsonify, request
 from functools import wraps
 import jwt
+from jwt.exceptions import DecodeError
+
 from app import db, app
 
 
@@ -25,16 +27,13 @@ class User(db.Model):
     def token_required(f):
         @wraps(f)
         def decorator(*args, **kwargs):
-            token = None
-            if 'x-access-token' in request.headers:
-                token = request.headers['x-access-token']
 
+            token = request.headers['x-access-token'] if 'x-access-token' in request.headers else None
             if not token:
                 return jsonify({'message': 'a valid token is missing'})
             try:
                 data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-                current_user = User.query.filter_by(id=data['id']).first()
-            except:
+            except DecodeError:
                 return jsonify({'message': 'token is invalid'})
 
             return f(*args, **kwargs)

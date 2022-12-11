@@ -1,25 +1,22 @@
-from flask import Flask, jsonify, make_response, request
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 import os
-
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_sqlalchemy import SQLAlchemy
 import jwt
 import datetime
 
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, jsonify, make_response, request
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from dotenv import load_dotenv
+load_dotenv()
+
 app = Flask(__name__)
-app.config.from_object(os.environ['APP_SETTINGS'])
+app.config.from_object(os.getenv('APP_SETTINGS'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 from models import User
 
 migrate = Migrate(app, db)
-
-
-@app.route('/')
-def hello_world():
-    return 'Hello World!'
 
 
 # User Database Route
@@ -46,7 +43,6 @@ def get_all_users():
     return jsonify({'users': output})
 
 
-# route for logging user in
 @app.route('/login', methods=['POST'])
 def login():
     # parses the incoming JSON request
@@ -63,7 +59,6 @@ def login():
     user = User.query \
         .filter_by(email=auth.get('email')) \
         .first()
-
     if not user:
         # returns 401 if user does not exist
         return make_response(
@@ -79,6 +74,7 @@ def login():
             'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
         }, app.config['SECRET_KEY'], algorithm="HS256")
         return make_response(jsonify({'token': token}), 200)
+
     # returns 403 if password is wrong
     return make_response(
         'Could not verify',
@@ -87,16 +83,15 @@ def login():
     )
 
 
-# signup route
 @app.route('/signup', methods=['POST'])
 def signup():
     # parses the incoming JSON request
     data = request.get_json(force=True)
 
     # gets email and password
-    email = data['email']
-    password = data['password']
-    phone_num = data['phone_num']
+    email = data.get('email')
+    password = data.get('password')
+    phone_num = data.get('phone_num')
 
     # checking for existing user
     user = User.query \
@@ -119,14 +114,15 @@ def signup():
         return make_response('User already exists. Please Log in.', 202)
 
 
-# route to update the user
-@app.route('/user/<user_id>', methods=['POST'])
+@app.route('/user/<user_id>', methods=['PATCH'])
 @User.token_required
 def update(user_id):
     body = request.get_json(force=True)
     user = User.query.get(user_id)
+
     if not user:
         return make_response('User not found.', 400)
+
     for key, value in body.items():
         setattr(user, key, value)
     db.session.commit()
