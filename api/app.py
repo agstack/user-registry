@@ -19,30 +19,6 @@ from models import User
 migrate = Migrate(app, db)
 
 
-# User Database Route
-# this route sends back list of users
-@app.route('/user', methods=['GET'])
-@User.token_required
-def get_all_users():
-    # querying the database
-    # for all the entries in it
-    users = User.query.all()
-    # converting the query objects
-    # to list of jsons
-    output = []
-    for user in users:
-        # appending the user data json
-        # to the response list
-        output.append({
-            'id': user.id,
-            'email': user.email,
-            'phone_num': user.phone_num,
-            'discoverable': user.discoverable
-        })
-
-    return jsonify({'users': output})
-
-
 @app.route('/login', methods=['POST'])
 def login():
     # parses the incoming JSON request
