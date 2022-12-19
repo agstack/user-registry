@@ -1,22 +1,10 @@
-import os
 import jwt
 import datetime
 
-from flask_migrate import Migrate
-from flask_sqlalchemy import SQLAlchemy
+from app import app, db
 from flask import Flask, jsonify, make_response, request
 from werkzeug.security import generate_password_hash, check_password_hash
-
-from dotenv import load_dotenv
-load_dotenv()
-
-app = Flask(__name__)
-app.config.from_object(os.getenv('APP_SETTINGS'))
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-from models import User
-
-migrate = Migrate(app, db)
+from app.models.user import User
 
 
 @app.route('/login', methods=['POST'])
@@ -105,6 +93,3 @@ def update(user_id):
 
     return make_response('User updated successfully.', 200)
 
-
-if __name__ == '__main__':
-    app.run()
