@@ -43,14 +43,14 @@ class User(db.Model):
 
 
 class ListType(enum.Enum):
-    black_list = 0
-    blue_list = 1
+    black_list = "0"
+    blue_list = "1"
 
 
 class DomainCheck(db.Model):
     __tablename__ = 'domaincheck'
     id = db.Column(db.Integer, primary_key=True)
-    belongs_to = db.Column(ChoiceType(ListType, impl=db.Integer()))
+    belongs_to = db.Column(ChoiceType(ListType, impl=db.String()))
     domain = db.Column(db.String())
 
 
