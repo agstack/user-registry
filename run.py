@@ -4,7 +4,7 @@ import datetime
 from app import app, db
 from flask import Flask, jsonify, make_response, request
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.models.user import User
+from app.models.user import User, DomainCheck, ListType
 
 
 @app.route('/login', methods=['POST'])
@@ -56,6 +56,18 @@ def signup():
     email = data.get('email')
     password = data.get('password')
     phone_num = data.get('phone_num')
+    email = email.strip()
+    if '@' not in email or email[-1] == '@':
+        return make_response('Please provide a valid email address', 400)
+    domain = email.split('@')[1]
+    try:
+        domain_belongs_to = DomainCheck.query \
+            .filter_by(domain=domain) \
+            .first().belongs_to
+    except AttributeError:
+        domain_belongs_to = -1
+    if domain_belongs_to == ListType.black_list:
+        return make_response('You are not allowed to register', 401)
 
     # checking for existing user
     user = User.query \
@@ -92,4 +104,3 @@ def update(user_id):
     db.session.commit()
 
     return make_response('User updated successfully.', 200)
-

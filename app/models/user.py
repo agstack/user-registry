@@ -2,7 +2,8 @@ from flask import jsonify, request
 from functools import wraps
 import jwt
 from jwt.exceptions import DecodeError
-
+import enum
+from sqlalchemy_utils import ChoiceType
 from app import db, app
 
 
@@ -39,3 +40,19 @@ class User(db.Model):
             return f(*args, **kwargs)
 
         return decorator
+
+
+class ListType(enum.Enum):
+    black_list = 0
+    blue_list = 1
+
+
+class DomainCheck(db.Model):
+    __tablename__ = 'domaincheck'
+    id = db.Column(db.Integer, primary_key=True)
+    belongs_to = db.Column(ChoiceType(ListType, impl=db.Integer()))
+    domain = db.Column(db.String())
+
+
+    def __repr__(self):
+        return '<domain {}>'.format(self.domain)

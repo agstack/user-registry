@@ -25,6 +25,12 @@ def upgrade():
     sa.Column('password', sa.String(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
+    op.create_table('domaincheck',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('belongs_to', sa.Integer(), nullable=True),
+    sa.Column('domain', sa.String(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
     # ### end Alembic commands ###
 
 
