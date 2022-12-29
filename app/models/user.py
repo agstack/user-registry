@@ -15,12 +15,16 @@ class User(db.Model):
     email = db.Column(db.String())
     password = db.Column(db.String())
     discoverable = db.Column(db.Boolean())
+    # authority = db.relationship('DomainCheck', backref='user', lazy=True)
+    domain_id = db.Column(db.Integer, db.ForeignKey('domaincheck.id'),
+                          nullable=False)
 
-    def __init__(self, phone_num, email, password):
+    def __init__(self, phone_num, email, password, domain_id):
         self.phone_num = phone_num
         self.email = email
         self.password = password
         self.discoverable = True  # default value True
+        self.domain_id = domain_id
 
     def __repr__(self):
         return '<id {}>'.format(self.id)
@@ -43,8 +47,8 @@ class User(db.Model):
 
 
 class ListType(enum.Enum):
-    black_list = "0"
     blue_list = "1"
+    authorized = "0"
 
 
 class DomainCheck(db.Model):
@@ -52,7 +56,25 @@ class DomainCheck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     belongs_to = db.Column(ChoiceType(ListType, impl=db.String()))
     domain = db.Column(db.String())
+    authority_token = db.Column(db.String(16), nullable=True)
+    users = db.relationship('User', backref='domain', lazy=True)
+
+
+
+    def __init__(self, belongs_to, domain, authority_token):
+        self.belongs_to = belongs_to
+        self.domain = domain
+        self.authority_token = authority_token
 
 
     def __repr__(self):
         return '<domain {}>'.format(self.domain)
+
+
+class BlackList(db.Model):
+    __tablename__ = 'blacklist'
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String())
+
+    def __repr__(self):
+        return '<blacklisted email{}>'.format(self.email)
