@@ -1,18 +1,19 @@
 """Initial migration.
 
-Revision ID: a83359c97b49
+Revision ID: 3e16cbf1dc97
 Revises: 
-Create Date: 2022-12-29 13:49:45.398808
+Create Date: 2023-01-01 16:14:44.727421
 
 """
+import sqlalchemy_utils
 from alembic import op
 import sqlalchemy as sa
-import sqlalchemy_utils
-from app.models.user import ListType
 
+from app import db
+from app.models.domainCheck import ListType
 
 # revision identifiers, used by Alembic.
-revision = 'a83359c97b49'
+revision = '3e16cbf1dc97'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -27,7 +28,7 @@ def upgrade():
     )
     op.create_table('domaincheck',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('belongs_to', sqlalchemy_utils.types.choice.ChoiceType(ListType), nullable=True),
+    sa.Column('belongs_to', sqlalchemy_utils.types.choice.ChoiceType(ListType, impl=db.String()), nullable=True),
     sa.Column('domain', sa.String(), nullable=True),
     sa.Column('authority_token', sa.String(length=16), nullable=True),
     sa.PrimaryKeyConstraint('id')

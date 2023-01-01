@@ -4,7 +4,7 @@ import datetime
 from app import app, db
 from flask import Flask, jsonify, make_response, request
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.models.user import User, DomainCheck, ListType
+from app.models import user as User, blackList, domainCheck
 from utils import check_email, allowed_to_register
 
 
@@ -90,7 +90,7 @@ def signup():
 
 
 @app.route('/user/<user_id>', methods=['PATCH'])
-@User.token_required
+@User.User.token_required
 def update(user_id):
     body = request.get_json(force=True)
     user = User.query.get(user_id)

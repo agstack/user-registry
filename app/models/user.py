@@ -2,8 +2,6 @@ from flask import jsonify, request
 from functools import wraps
 import jwt
 from jwt.exceptions import DecodeError
-import enum
-from sqlalchemy_utils import ChoiceType
 from app import db, app
 
 
@@ -44,37 +42,3 @@ class User(db.Model):
             return f(*args, **kwargs)
 
         return decorator
-
-
-class ListType(enum.Enum):
-    blue_list = "1"
-    authorized = "0"
-
-
-class DomainCheck(db.Model):
-    __tablename__ = 'domaincheck'
-    id = db.Column(db.Integer, primary_key=True)
-    belongs_to = db.Column(ChoiceType(ListType, impl=db.String()))
-    domain = db.Column(db.String())
-    authority_token = db.Column(db.String(16), nullable=True)
-    users = db.relationship('User', backref='domain', lazy=True)
-
-
-
-    def __init__(self, belongs_to, domain, authority_token):
-        self.belongs_to = belongs_to
-        self.domain = domain
-        self.authority_token = authority_token
-
-
-    def __repr__(self):
-        return '<domain {}>'.format(self.domain)
-
-
-class BlackList(db.Model):
-    __tablename__ = 'blacklist'
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String())
-
-    def __repr__(self):
-        return '<blacklisted email{}>'.format(self.email)

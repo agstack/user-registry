@@ -1,7 +1,7 @@
 import random
 import re
 import string
-from app.models.user import DomainCheck, ListType, BlackList
+from app.models import blackList, domainCheck
 from app import db
 
 
@@ -15,7 +15,7 @@ def check_email(email):
 
 
 def is_blacklisted(email):
-    if BlackList.query.filter_by(email=email).first() is not None:
+    if blackList.BlackList.query.filter_by(email=email).first() is not None:
         return True
     return False
 
@@ -26,15 +26,15 @@ def allowed_to_register(email):
         return False
     domain = email.split('@')[1]
     try:
-        domain_belongs_to = DomainCheck.query \
+        domain_belongs_to = domainCheck.DomainCheck.query \
             .filter_by(domain=domain) \
             .first().belongs_to
     except AttributeError:
         issue_auth_token(domain)
-        return DomainCheck.query \
+        return domainCheck.DomainCheck.query \
             .filter_by(domain=domain).first().id
     if domain_belongs_to == ListType.authorized:
-        return DomainCheck.query \
+        return domainCheck.DomainCheck.query \
             .filter_by(domain=domain).first().id
     if domain_belongs_to == ListType.blue_list:
         return False
@@ -42,9 +42,9 @@ def allowed_to_register(email):
 
 def issue_auth_token(domain):
     token = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-    while DomainCheck.query.filter_by(authority_token=token).first() is not None:
+    while domainCheck.DomainCheck.query.filter_by(authority_token=token).first() is not None:
         token = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-    add_domain = DomainCheck("0", domain, token)
+    add_domain = domainCheck.DomainCheck("0", domain, token)
     db.session.add(add_domain)
     db.session.commit()
 
