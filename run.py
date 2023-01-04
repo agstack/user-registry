@@ -64,7 +64,6 @@ def signup():
     if not token_or_allowed:
         return make_response('You are not allowed to register', 401)
     else:
-        print(token_or_allowed)
         domain_id = token_or_allowed
 
     # checking for existing user
