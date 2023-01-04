@@ -4,7 +4,7 @@ import datetime
 from app import app, db
 from flask import Flask, jsonify, make_response, request
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.models import user as User, blackList, domainCheck
+from app.models import user as userModel, blackList, domainCheck
 from utils import check_email, allowed_to_register
 
 
@@ -21,7 +21,7 @@ def login():
             {'WWW-Authenticate': 'Basic realm ="Login required !!"'}
         )
 
-    user = User.query \
+    user = userModel.User.query \
         .filter_by(email=auth.get('email')) \
         .first()
     if not user:
@@ -68,12 +68,12 @@ def signup():
         domain_id = token_or_allowed
 
     # checking for existing user
-    user = User.query \
+    user = userModel.User.query \
         .filter_by(email=email) \
         .first()
     if not user:
         # database ORM object
-        user = User(
+        user = userModel.User(
             phone_num=phone_num,
             email=email,
             password=generate_password_hash(password),
@@ -90,10 +90,10 @@ def signup():
 
 
 @app.route('/user/<user_id>', methods=['PATCH'])
-@User.User.token_required
+@userModel.User.token_required
 def update(user_id):
     body = request.get_json(force=True)
-    user = User.query.get(user_id)
+    user = userModel.User.query.get(user_id)
 
     if not user:
         return make_response('User not found.', 400)

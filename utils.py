@@ -3,6 +3,7 @@ import re
 import string
 from app.models import blackList, domainCheck
 from app import db
+from app.models.domainCheck import ListType
 
 
 # function for validating an Email
@@ -18,7 +19,6 @@ def is_blacklisted(email):
     if blackList.BlackList.query.filter_by(email=email).first() is not None:
         return True
     return False
-
 
 
 def allowed_to_register(email):
