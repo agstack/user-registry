@@ -4,7 +4,7 @@ import datetime
 from app import app, db
 from flask import Flask, jsonify, make_response, request
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.models import user as userModel, blackList, domainCheck
+from app.models import user as userModel
 from utils import check_email, allowed_to_register
 
 
@@ -98,7 +98,23 @@ def update(user_id):
         return make_response('User not found.', 400)
 
     for key, value in body.items():
-        setattr(user, key, value)
+        if key == 'email':
+            value = value.strip()
+            if not check_email(value):
+                return make_response('Please provide a valid email address', 400)
+            token_or_allowed = allowed_to_register(value)
+            if not token_or_allowed:
+                return make_response('Blacklisted email', 401)
+            else:
+                domain_id = token_or_allowed
+                setattr(user, key, value)
+                setattr(user, 'domain_id', domain_id)
+
+        elif key == 'password':
+            password = generate_password_hash(value)
+            setattr(user, key, password)
+        else:
+            setattr(user, key, value)
     db.session.commit()
 
     return make_response('User updated successfully.', 200)

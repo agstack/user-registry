@@ -29,9 +29,9 @@ def is_blacklisted(email):
 
 def allowed_to_register(email):
     """
-    This function takes in an email and returns false if it is blacklisted or is blue-listed. If the domain is already
-    authorized, it returns the domain. if the domain don't already exist in the database and is not blue-listed,
-    it issues a token and returns the domain
+    This function takes in an email and returns false if it is blacklisted. If the domain is already
+    authorized, or it is blue-listed, it returns the domain_id. If the domain don't already exist in the database,
+    it issues a token and returns the domain_id
     """
     if is_blacklisted(email):
         return False
