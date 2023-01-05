@@ -4,7 +4,8 @@ import datetime
 from app import app, db
 from flask import Flask, jsonify, make_response, request
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.models.user import User
+from app.models import user as userModel
+from utils import check_email, allowed_to_register
 
 
 @app.route('/login', methods=['POST'])
@@ -20,7 +21,7 @@ def login():
             {'WWW-Authenticate': 'Basic realm ="Login required !!"'}
         )
 
-    user = User.query \
+    user = userModel.User.query \
         .filter_by(email=auth.get('email')) \
         .first()
     if not user:
@@ -56,17 +57,26 @@ def signup():
     email = data.get('email')
     password = data.get('password')
     phone_num = data.get('phone_num')
+    email = email.strip()
+    if not check_email(email):
+        return make_response('Please provide a valid email address', 400)
+    token_or_allowed = allowed_to_register(email)
+    if not token_or_allowed:
+        return make_response('You are not allowed to register', 401)
+    else:
+        domain_id = token_or_allowed
 
     # checking for existing user
-    user = User.query \
+    user = userModel.User.query \
         .filter_by(email=email) \
         .first()
     if not user:
         # database ORM object
-        user = User(
+        user = userModel.User(
             phone_num=phone_num,
             email=email,
-            password=generate_password_hash(password)
+            password=generate_password_hash(password),
+            domain_id=domain_id
         )
         # insert user
         db.session.add(user)
@@ -79,17 +89,32 @@ def signup():
 
 
 @app.route('/user/<user_id>', methods=['PATCH'])
-@User.token_required
+@userModel.User.token_required
 def update(user_id):
     body = request.get_json(force=True)
-    user = User.query.get(user_id)
+    user = userModel.User.query.get(user_id)
 
     if not user:
         return make_response('User not found.', 400)
 
     for key, value in body.items():
-        setattr(user, key, value)
+        if key == 'email':
+            value = value.strip()
+            if not check_email(value):
+                return make_response('Please provide a valid email address', 400)
+            token_or_allowed = allowed_to_register(value)
+            if not token_or_allowed:
+                return make_response('Blacklisted email', 401)
+            else:
+                domain_id = token_or_allowed
+                setattr(user, key, value)
+                setattr(user, 'domain_id', domain_id)
+
+        elif key == 'password':
+            password = generate_password_hash(value)
+            setattr(user, key, password)
+        else:
+            setattr(user, key, value)
     db.session.commit()
 
     return make_response('User updated successfully.', 200)
-
