@@ -13,7 +13,6 @@ class User(db.Model):
     email = db.Column(db.String())
     password = db.Column(db.String())
     discoverable = db.Column(db.Boolean())
-    # authority = db.relationship('DomainCheck', backref='user', lazy=True)
     domain_id = db.Column(db.Integer, db.ForeignKey('domaincheck.id'),
                           nullable=False)
 
