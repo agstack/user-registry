@@ -60,4 +60,3 @@ def issue_auth_token(domain):
     add_domain = domainCheck.DomainCheck("0", domain, token)
     db.session.add(add_domain)
     db.session.commit()
-
