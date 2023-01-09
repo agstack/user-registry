@@ -2,10 +2,16 @@ import jwt
 import datetime
 
 from app import app, db
-from flask import Flask, jsonify, make_response, request
+from flask import Flask, jsonify, make_response, request, render_template, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import user as userModel
 from utils import check_email, allowed_to_register
+from forms import SignupForm
+
+
+@app.route('/')
+def index():
+    return render_template('login.html')
 
 
 @app.route('/login', methods=['POST'])
@@ -48,44 +54,54 @@ def login():
     )
 
 
-@app.route('/signup', methods=['POST'])
+@app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    # parses the incoming JSON request
-    data = request.get_json(force=True)
+    form = SignupForm()
+    if form.validate_on_submit():
 
-    # gets email and password
-    email = data.get('email')
-    password = data.get('password')
-    phone_num = data.get('phone_num')
-    email = email.strip()
-    if not check_email(email):
-        return make_response('Please provide a valid email address', 400)
-    token_or_allowed = allowed_to_register(email)
-    if not token_or_allowed:
-        return make_response('You are not allowed to register', 401)
-    else:
-        domain_id = token_or_allowed
+        # gets email and password
+        email = form.email.data
+        password = form.password.data
+        phone_num = form.phone_num.data
+        discoverable = form.discoverable.data
+        # print("HERE")
+        # email = email.strip()
+        # if not check_email(email):
+        #     return make_response('Please provide a valid email address', 400)
+        token_or_allowed = allowed_to_register(email)
+        if not token_or_allowed:
+            flash(message='This email is blacklisted', category='danger')
+            # return render_template('signup.html', form=form)
+        else:
+            domain_id = token_or_allowed
 
-    # checking for existing user
-    user = userModel.User.query \
-        .filter_by(email=email) \
-        .first()
-    if not user:
-        # database ORM object
-        user = userModel.User(
-            phone_num=phone_num,
-            email=email,
-            password=generate_password_hash(password),
-            domain_id=domain_id
-        )
-        # insert user
-        db.session.add(user)
-        db.session.commit()
+        # checking for existing user
+            user = userModel.User.query \
+                .filter_by(email=email) \
+                .first()
+            if not user:
+                # database ORM object
+                user = userModel.User(
+                    phone_num=phone_num,
+                    email=email,
+                    password=generate_password_hash(password),
+                    domain_id=domain_id
+                )
+                # insert user
+                db.session.add(user)
+                db.session.commit()
 
-        return make_response('Successfully registered.', 200)
-    else:
-        # returns 202 if user already exists
-        return make_response('User already exists. Please Log in.', 202)
+                # return make_response('Successfully registered.', 200)
+
+                flash(message='You are registered successfully', category='success')
+                # return render_template('signup.html', form=form)
+            else:
+                # returns 202 if user already exists
+
+                flash(message=f'A user with email "{email}" already exists. Please login!', category='info')
+                # return render_template('signup.html', form=form)
+
+    return render_template('signup.html', form=form)
 
 
 @app.route('/user/<user_id>', methods=['PATCH'])
