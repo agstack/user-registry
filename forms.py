@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from wtforms import (StringField, BooleanField,
                      EmailField, PasswordField)
-from wtforms.validators import InputRequired, Length, Email, DataRequired, EqualTo, Regexp
+from wtforms.validators import InputRequired, Email, DataRequired, EqualTo, Regexp
 
 
 class SignupForm(FlaskForm):
@@ -15,3 +15,9 @@ class SignupForm(FlaskForm):
 
     newsletter = BooleanField('Subscribe to our newsletter', default='checked')
     discoverable = BooleanField('Do you want your profile to be discoverable?', default='checked')
+
+
+class LoginForm(FlaskForm):
+    email = EmailField('Email', validators=[InputRequired(), Email()])
+    password = PasswordField('New Password',
+                             validators=[DataRequired()])
