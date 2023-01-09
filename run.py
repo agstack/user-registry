@@ -64,14 +64,9 @@ def signup():
         password = form.password.data
         phone_num = form.phone_num.data
         discoverable = form.discoverable.data
-        # print("HERE")
-        # email = email.strip()
-        # if not check_email(email):
-        #     return make_response('Please provide a valid email address', 400)
         token_or_allowed = allowed_to_register(email)
         if not token_or_allowed:
             flash(message='This email is blacklisted', category='danger')
-            # return render_template('signup.html', form=form)
         else:
             domain_id = token_or_allowed
 
@@ -90,16 +85,10 @@ def signup():
                 # insert user
                 db.session.add(user)
                 db.session.commit()
-
-                # return make_response('Successfully registered.', 200)
-
                 flash(message='You are registered successfully', category='success')
-                # return render_template('signup.html', form=form)
             else:
-                # returns 202 if user already exists
 
                 flash(message=f'A user with email "{email}" already exists. Please login!', category='info')
-                # return render_template('signup.html', form=form)
 
     return render_template('signup.html', form=form)
 
