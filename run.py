@@ -1,4 +1,3 @@
-import jwt
 import datetime
 
 from app import app, db
@@ -7,6 +6,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import user as userModel
 from utils import check_email, allowed_to_register
 from forms import SignupForm
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
+
+jwt = JWTManager(app)
 
 
 @app.route('/')
@@ -40,11 +42,8 @@ def login():
 
     if check_password_hash(user.password, auth.get('password')):
         # generates the JWT Token
-        token = jwt.encode({
-            'id': user.id,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)
-        }, app.config['SECRET_KEY'], algorithm="HS256")
-        return make_response(jsonify({'token': token}), 200)
+        access_token = create_access_token(identity=user.id)
+        return make_response(jsonify({'access_token': access_token}), 200)
 
     # returns 403 if password is wrong
     return make_response(
@@ -91,6 +90,12 @@ def signup():
                 flash(message=f'A user with email "{email}" already exists. Please login!', category='info')
 
     return render_template('signup.html', form=form)
+
+
+@jwt.user_lookup_loader
+def user_lookup_callback(_jwt_header, jwt_data):
+    identity = jwt_data["sub"]
+    return userModel.User.query.filter_by(id=identity).one_or_none()
 
 
 @app.route('/user/<user_id>', methods=['PATCH'])

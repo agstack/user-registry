@@ -5,7 +5,7 @@ from wtforms.validators import InputRequired, Email, DataRequired, EqualTo, Rege
 
 
 class SignupForm(FlaskForm):
-    email = EmailField('Email', validators=[InputRequired(), Email()])
+    email = StringField('Email', validators=[InputRequired(), Email(message='Enter a valid email')])
     phone_num = StringField('Phone Number', validators=[InputRequired()])
     password = PasswordField('New Password',
                              validators=[DataRequired(), Regexp("^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,}", message="Please follow the guidelines for a strong password")])
@@ -18,6 +18,6 @@ class SignupForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
-    email = EmailField('Email', validators=[InputRequired(), Email()])
+    email = EmailField('Email', validators=[InputRequired(), Email(message='Enter a valid email')])
     password = PasswordField('New Password',
                              validators=[DataRequired()])
