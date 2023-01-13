@@ -1,150 +1,115 @@
-{% extends 'base.html' %}
+{% extends 'auth-template.html' %}
+{% set active_page='signup' %}
 {% block title %}
     Signup
 {% endblock %}
-{% block content %}
-    <!-- Section: Design Block -->
-<section class="text-center">
-  <!-- Background image -->
-  <div class="p-5 bg-image" style="
-          background-color: #83a846;
-          background-repeat: no-repeat;
-          background-position: 50% 0%;
-          background-attachment: scroll;
-          background-image: url({{ url_for('static', filename='register.jpg') }}), linear-gradient( to right, #83a846, #0070e8 );
-         height: 600px;
-        "></div>
-  <!-- Background image -->
-<div class="container">
-  <div class="card mx-4 mx-md-5 shadow-5-strong" style="
-        margin-top: -450px;
-        margin-bottom: 5%;
-        background: hsla(0, 0%, 100%, 0.8);
-        backdrop-filter: blur(90px);
-        ">
-    <div class="card-body py-5 px-md-5">
+{% block form_heading %}
+    Sign up now
+{% endblock %}
+{% block auth_form_content %}
+    <!-- Email input -->
 
-      <div class="row d-flex justify-content-center">
-        <div class="col-lg-8">
-          <h2 class="fw-bold mb-5">Sign up now</h2>
-            {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <ul class="flashes">
-    {% for category, message in messages %}
-      <li class="alert alert-{{ category }}" role="alert">{{ message }}</li>
-    {% endfor %}
+    <div class="form-outline mb-4 text-start">
+        {{ form.email.label(class_="form-label ms-1") }}
+        {{ form.email(class_="form-control") }}
+     {% if form.email.errors %}
+    <ul>
+        {% for error in form.email.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
     </ul>
-  {% endif %}
-{% endwith %}
-          <form method="POST">
-              {{ form.csrf_token }}
-            <!-- Email input -->
-
-            <div class="form-outline mb-4 text-start">
-                {{ form.email.label(class_="form-label ms-1") }}
-                {{ form.email(class_="form-control") }}
-             {% if form.email.errors %}
-            <ul>
-                {% for error in form.email.errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-            </div>
-            <!-- Number input -->
-
-            <div class="form-outline mb-4 text-start">
-                {{ form.phone_num.label(class_="form-label ms-1") }}
-                {{ form.phone_num(class_="form-control") }}
-             {% if form.phone_num.errors %}
-            <ul>
-                {% for error in form.phone_num.errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-            </div>
-
-            <!-- Password input -->
-
-            <div class="form-outline mb-4 text-start">
-                {{ form.password.label(class_="form-label ms-1") }}
-                {{ form.password(class_="form-control") }}
-
-            {% if form.password.errors %}
-            <ul>
-                {% for error in form.password.errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-            <p class="text-muted ms-1">Password must be at least 8 characters long. It must contain an upper-case letter, a lower-case letter and a number</p>
-            </div>
-
-              <div class="form-outline mb-4 text-start">
-                {{ form.confirm_pass.label(class_="form-label ms-1") }}
-                {{ form.confirm_pass(class_="form-control") }}
-            {% if form.confirm_pass.errors %}
-            <ul>
-                {% for error in form.confirm_pass.errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-            </div>
-
-            <!-- Checkbox -->
-
-
-          <div class="form-check d-flex justify-content-center mb-4">
-                {{ form.discoverable(class_="form-check-input me-2") }} {{ form.discoverable.label(class_="form-check-label") }}
-            {% if form.discoverable.errors %}
-            <ul>
-                {% for error in form.discoverable.errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-            </div>
-
-            <div class="form-check d-flex justify-content-center mb-4">
-                {{ form.newsletter(class_="form-check-input me-2") }} {{ form.newsletter.label(class_="form-check-label") }}
-            {% if form.newsletter.errors %}
-            <ul>
-                {% for error in form.newsletter.errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-            </div>
-
-
-            <!-- Submit button -->
-          <input type="submit" class="btn btn-primary btn-block mb-4" value="Sign up">
-            <div class="text-center">
-              <p>or sign up with:</p>
-              <button type="button" class="btn btn-link btn-floating mx-1">
-                <i class="fab fa-facebook-f"></i>
-              </button>
-
-              <button type="button" class="btn btn-link btn-floating mx-1">
-                <i class="fab fa-google"></i>
-              </button>
-
-              <button type="button" class="btn btn-link btn-floating mx-1">
-                <i class="fab fa-twitter"></i>
-              </button>
-
-              <button type="button" class="btn btn-link btn-floating mx-1">
-                <i class="fab fa-github"></i>
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+     {% endif %}
     </div>
-  </div>
+    <!-- Number input -->
+
+    <div class="form-outline mb-4 text-start">
+        {{ form.phone_num.label(class_="form-label ms-1") }}
+        {{ form.phone_num(class_="form-control") }}
+     {% if form.phone_num.errors %}
+    <ul>
+        {% for error in form.phone_num.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
     </div>
-</section>
+
+    <!-- Password input -->
+
+    <div class="form-outline mb-4 text-start">
+        {{ form.password.label(class_="form-label ms-1") }}
+        {{ form.password(class_="form-control") }}
+
+    {% if form.password.errors %}
+    <ul>
+        {% for error in form.password.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+    <p class="text-muted ms-1">Password must be at least 8 characters long. It must contain an upper-case letter, a lower-case letter and a number</p>
+    </div>
+
+      <div class="form-outline mb-4 text-start">
+        {{ form.confirm_pass.label(class_="form-label ms-1") }}
+        {{ form.confirm_pass(class_="form-control") }}
+    {% if form.confirm_pass.errors %}
+    <ul>
+        {% for error in form.confirm_pass.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+    </div>
+
+    <!-- Checkbox -->
+
+
+  <div class="form-check d-flex justify-content-center mb-4">
+        {{ form.discoverable(class_="form-check-input me-2") }} {{ form.discoverable.label(class_="form-check-label") }}
+    {% if form.discoverable.errors %}
+    <ul>
+        {% for error in form.discoverable.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+    </div>
+
+    <div class="form-check d-flex justify-content-center mb-4">
+        {{ form.newsletter(class_="form-check-input me-2") }} {{ form.newsletter.label(class_="form-check-label") }}
+    {% if form.newsletter.errors %}
+    <ul>
+        {% for error in form.newsletter.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+    </div>
+
+
+    <!-- Submit button -->
+  <input type="submit" class="btn btn-primary btn-block mb-4" value="Sign up">
+    <div class="text-center">
+      <p>or sign up with:</p>
+      <button type="button" class="btn btn-link btn-floating mx-1">
+        <i class="fab fa-facebook-f"></i>
+      </button>
+
+      <button type="button" class="btn btn-link btn-floating mx-1">
+        <i class="fab fa-google"></i>
+      </button>
+
+      <button type="button" class="btn btn-link btn-floating mx-1">
+        <i class="fab fa-twitter"></i>
+      </button>
+
+      <button type="button" class="btn btn-link btn-floating mx-1">
+        <i class="fab fa-github"></i>
+      </button>
+      <p class="mt-4">Already have an account? <a href="{{ url_for('login') }}">Login</a></p>
+
+    </div>
+
 <!-- Section: Design Block -->
 {% endblock %}

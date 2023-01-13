@@ -18,6 +18,6 @@ class SignupForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
-    email = EmailField('Email', validators=[InputRequired(), Email(message='Enter a valid email')])
+    email = StringField('Email', validators=[InputRequired(), Email(message='Enter a valid email')])
     password = PasswordField('New Password',
                              validators=[DataRequired()])

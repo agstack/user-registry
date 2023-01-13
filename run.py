@@ -1,70 +1,95 @@
 from datetime import timedelta, datetime, timezone
-
+import jwt as pyjwt
 from app import app, db
-from flask import Flask, jsonify, make_response, request, render_template, flash
+from flask import Flask, jsonify, make_response, request, render_template, flash, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import user as userModel
 from app.models import tokenBlocklist
 from app.models.tokenBlocklist import TokenBlocklist
 from utils import check_email, allowed_to_register
-from forms import SignupForm
+from forms import SignupForm, LoginForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
     JWTManager, current_user, \
-    create_refresh_token, get_jwt
+    create_refresh_token, get_jwt, set_access_cookies, set_refresh_cookies, unset_access_cookies, unset_jwt_cookies
 
-# If true this will only allow the cookies that contain your JWTs to be sent
-# over https. In production, this should always be set to True
-app.config["JWT_COOKIE_SECURE"] = False
-app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
-app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=30)
-# following must be made true in production
-app.config['JWT_COOKIE_CSRF_PROTECT'] = False
 jwt = JWTManager(app)
 
 
-@app.route('/')
-def index():
-    return render_template('login.html')
+@app.route('/home', methods=['GET', 'POST'])
+@jwt_required()
+def home():
+    return render_template('home.html')
 
 
-@app.route('/login', methods=['POST'])
+@jwt.unauthorized_loader
+def unauthorized_callback(callback):
+    # Missing auth header
+    flash(message='You need to login first!', category='warning')
+
+    return make_response(login(), 401)
+
+
+@jwt.expired_token_loader
+def expired_token_callback(callback, callback2):
+    try:
+        ref_token = request.cookies.get('refresh_token_cookie')
+        pyjwt.decode(ref_token, app.config['SECRET_KEY'], algorithms="HS256")
+    # exp_timestamp = ref_token["exp"]
+    # now = datetime.now(timezone.utc)
+    # now_timestamp = datetime.timestamp(now)
+    # if now_timestamp > exp_timestamp:
+    #     print('YESSS')
+    #     resp = make_response(redirect(app.config['BASE_URL']))
+    #     unset_jwt_cookies(resp)
+    #     return resp
+    except pyjwt.ExpiredSignatureError:
+        resp = make_response(redirect(app.config['BASE_URL']))
+        unset_jwt_cookies(resp)
+        return resp
+    resp = make_response(redirect(app.config['BASE_URL'] + '/refresh'))
+    unset_access_cookies(resp)
+    return resp
+
+
+@app.route('/', methods=['GET', 'POST'])
 def login():
-    # parses the incoming JSON request
-    auth = request.get_json(force=True)
+    form = LoginForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        password = form.password.data
+        user = userModel.User.query \
+            .filter_by(email=email) \
+            .first()
+    # if not auth or not auth['email'] or not auth['password']:
+    #     # returns 401 if any email or / and password is missing
+    #     return make_response(
+    #         'Could not verify',
+    #         401,
+    #         {'WWW-Authenticate': 'Basic realm ="Login required !!"'}
+    #     )
 
-    if not auth or not auth['email'] or not auth['password']:
-        # returns 401 if any email or / and password is missing
-        return make_response(
-            'Could not verify',
-            401,
-            {'WWW-Authenticate': 'Basic realm ="Login required !!"'}
-        )
 
-    user = userModel.User.query \
-        .filter_by(email=auth.get('email')) \
-        .first()
-    if not user:
-        # returns 401 if user does not exist
-        return make_response(
-            'Could not verify',
-            401,
-            {'WWW-Authenticate': 'Basic realm ="User does not exist !!"'}
-        )
+        if not user:
+            # returns 401 if user does not exist
+            flash(message='You are not registered', category='danger')
+        else:
 
-    if check_password_hash(user.password, auth.get('password')):
-        # generates the JWT Token
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
-        return make_response(jsonify(access_token=access_token, refresh_token=refresh_token), 200)
+            if check_password_hash(user.password, password):
+                # generates the JWT Token
+                access_token = create_access_token(identity=user.id)
+                refresh_token = create_refresh_token(identity=user.id)
+                resp = make_response(redirect(url_for('home')))
+                set_access_cookies(resp, access_token)
+                set_refresh_cookies(resp, refresh_token)
+                return resp
+                # flash(message='Logged in', category='success')
 
-    # returns 403 if password is wrong
-    return make_response(
-        'Could not verify',
-        403,
-        {'WWW-Authenticate': 'Basic realm ="Wrong Password !!"'}
-    )
+                # return make_response(jsonify(access_token=access_token, refresh_token=refresh_token), 200)
+            else:
+                # returns 403 if password is wrong
+                flash(message='Incorrect Password!', category='danger')
+    return render_template('login.html', form=form)
 
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -106,6 +131,12 @@ def signup():
     return render_template('signup.html', form=form)
 
 
+# This function is necessary since it places the logged-in user's data
+# in the current_user
+# Register a callback function that loads a user from your database whenever
+# a protected route is accessed. This should return any python object on a
+# successful lookup, or None if the lookup failed for any reason (for example
+# if the user has been deleted from the database).
 @jwt.user_lookup_loader
 def user_lookup_callback(_jwt_header, jwt_data):
     identity = jwt_data["sub"]
@@ -114,12 +145,14 @@ def user_lookup_callback(_jwt_header, jwt_data):
 
 # We are using the `refresh=True` options in jwt_required to only allow
 # refresh tokens to access this route.
-@app.route("/refresh", methods=["POST"])
+@app.route("/refresh", methods=["GET"])
 @jwt_required(refresh=True)
 def refresh():
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
-    return jsonify(access_token=access_token)
+    resp = make_response(redirect(app.config['BASE_URL'] + '/home'))
+    set_access_cookies(resp, access_token)
+    return resp
 
 
 @app.route('/user', methods=['PATCH'])
@@ -155,7 +188,7 @@ def update():
 # identifier (jti) for the JWT into our database.
 @app.route("/logout", methods=["DELETE"])
 @jwt_required(verify_type=False)
-def modify_token():
+def logout():
     token = get_jwt()
     jti = token["jti"]
     ttype = token["type"]
@@ -166,6 +199,8 @@ def modify_token():
 
 
 # Callback function to check if a JWT exists in the database blocklist
+# This function is necessary to check if the token supplied is logged out
+# already
 @jwt.token_in_blocklist_loader
 def check_if_token_revoked(jwt_header, jwt_payload: dict) -> bool:
     jti = jwt_payload["jti"]
