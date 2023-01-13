@@ -16,8 +16,8 @@ app.config['BASE_URL'] = 'http://127.0.0.1:5000'  # Running on localhost
 # over https. In production, this should always be set to True
 app.config["JWT_COOKIE_SECURE"] = False
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=1)
-app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(minutes=2)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=5)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(minutes=10)
 # following must be made true in production
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False
 db = SQLAlchemy(app)
