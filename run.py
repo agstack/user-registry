@@ -1,19 +1,16 @@
-from datetime import datetime, timezone
 import jwt as pyjwt
 from app import app, db
-from flask import Flask, jsonify, make_response, request, render_template, flash, redirect, url_for
+from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import user as userModel
-from app.models import tokenBlocklist
-from app.models.tokenBlocklist import TokenBlocklist
 from utils import check_email, allowed_to_register
 from forms import SignupForm, LoginForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
     JWTManager, current_user, \
-    create_refresh_token, get_jwt, set_access_cookies, set_refresh_cookies, unset_access_cookies, unset_jwt_cookies
+    create_refresh_token, set_access_cookies, set_refresh_cookies, unset_access_cookies, unset_jwt_cookies
 
-jwt = JWTManager(app)
+jwt = JWTManager(app, add_context_processor=True)
 
 
 @app.route('/home', methods=['GET', 'POST'])
@@ -34,19 +31,27 @@ def unauthorized_callback(callback):
 
 @jwt.expired_token_loader
 def expired_token_callback(callback, callback2):
+    ref_token = request.cookies.get('refresh_token_cookie')
+    user = userModel.User.query. \
+        filter_by(refresh_token=ref_token).first()
     try:
-        ref_token = request.cookies.get('refresh_token_cookie')
         pyjwt.decode(ref_token, app.config['SECRET_KEY'], algorithms="HS256")
     except pyjwt.ExpiredSignatureError:
-        resp = make_response(redirect(app.config['BASE_URL']))
+        resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
+        user.refresh_token = None
+        user.access_token = None
+        db.session.commit()
         unset_jwt_cookies(resp)
         return resp
-    resp = make_response(redirect(app.config['BASE_URL'] + '/refresh'))
+    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/refresh'))
+    user.access_token = None
+    db.session.commit()
     unset_access_cookies(resp)
     return resp
 
 
 @app.route('/', methods=['GET', 'POST'])
+@jwt_required(optional=True)
 def login():
     form = LoginForm()
     if form.validate_on_submit():
@@ -65,6 +70,9 @@ def login():
                 access_token = create_access_token(identity=user.id)
                 refresh_token = create_refresh_token(identity=user.id)
                 resp = make_response(redirect(url_for('home')))
+                user.access_token = access_token
+                user.refresh_token = refresh_token
+                db.session.commit()
                 set_access_cookies(resp, access_token)
                 set_refresh_cookies(resp, refresh_token)
                 return resp
@@ -74,6 +82,7 @@ def login():
 
 
 @app.route('/signup', methods=['GET', 'POST'])
+@jwt_required(optional=True)
 def signup():
     form = SignupForm()
     if form.validate_on_submit():
@@ -104,10 +113,11 @@ def signup():
                 # insert user
                 db.session.add(user)
                 db.session.commit()
-                flash(message='You are registered successfully', category='success')
+                return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
             else:
 
-                flash(message=f'A user with email "{email}" already exists. Please login!', category='info')
+                flash(message=Markup(f'A user with email "{email}" already exists. Please  <a href="/" '
+                                     f'class="alert-link">login</a>!'), category='info')
 
     return render_template('signup.html', form=form)
 
@@ -135,7 +145,10 @@ def refresh():
     """
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
-    resp = make_response(redirect(app.config['BASE_URL'] + '/home'))
+    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
+    user = userModel.User.query.filter_by(id=current_user.id).first()
+    user.access_token = access_token
+    db.session.commit()
     set_access_cookies(resp, access_token)
     return resp
 
@@ -169,20 +182,20 @@ def update():
     return make_response('User updated successfully.', 200)
 
 
-@app.route("/logout", methods=["DELETE"])
-@jwt_required(verify_type=False)
+@app.route("/logout", methods=["GET"])
+@jwt_required(refresh=True)
 def logout():
     """
     Endpoint for revoking the current users access token. Saved the unique
     identifier (jti) for the JWT into our database.
     """
-    token = get_jwt()
-    jti = token["jti"]
-    ttype = token["type"]
-    now = datetime.now(timezone.utc)
-    db.session.add(tokenBlocklist.TokenBlocklist(jti=jti, type=ttype, created_at=now))
+    user = userModel.User.query.filter_by(id=current_user.id).first()
+    user.access_token = None
+    user.refresh_token = None
     db.session.commit()
-    return jsonify(msg=f"{ttype.capitalize()} token successfully revoked")
+    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
+    unset_jwt_cookies(resp)
+    return resp
 
 
 @jwt.token_in_blocklist_loader
@@ -193,6 +206,8 @@ def check_if_token_revoked(jwt_header, jwt_payload: dict) -> bool:
     already
     """
     jti = jwt_payload["jti"]
-    token = db.session.query(TokenBlocklist.id).filter_by(jti=jti).scalar()
+    token = userModel.User.query \
+        .filter_by(access_token=jti) \
+        .one_or_none()
 
     return token is not None

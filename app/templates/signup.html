@@ -11,7 +11,7 @@
 
     <div class="form-outline mb-4 text-start">
         {{ form.email.label(class_="form-label ms-1") }}
-        {{ form.email(class_="form-control") }}
+        {{ form.email(class_="form-control", placeholder_="Enter your email") }}
      {% if form.email.errors %}
     <ul>
         {% for error in form.email.errors %}
@@ -24,7 +24,7 @@
 
     <div class="form-outline mb-4 text-start">
         {{ form.phone_num.label(class_="form-label ms-1") }}
-        {{ form.phone_num(class_="form-control") }}
+        {{ form.phone_num(class_="form-control", placeholder_="Enter your phone number") }}
      {% if form.phone_num.errors %}
     <ul>
         {% for error in form.phone_num.errors %}
@@ -38,7 +38,7 @@
 
     <div class="form-outline mb-4 text-start">
         {{ form.password.label(class_="form-label ms-1") }}
-        {{ form.password(class_="form-control") }}
+        {{ form.password(class_="form-control", placeholder_="Enter your password") }}
 
     {% if form.password.errors %}
     <ul>
@@ -52,7 +52,7 @@
 
       <div class="form-outline mb-4 text-start">
         {{ form.confirm_pass.label(class_="form-label ms-1") }}
-        {{ form.confirm_pass(class_="form-control") }}
+        {{ form.confirm_pass(class_="form-control", placeholder_="Confirm your password") }}
     {% if form.confirm_pass.errors %}
     <ul>
         {% for error in form.confirm_pass.errors %}

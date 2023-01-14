@@ -9,6 +9,8 @@ class User(db.Model):
     email = db.Column(db.String())
     password = db.Column(db.String())
     discoverable = db.Column(db.Boolean())
+    access_token = db.Column(db.String(), nullable=True)
+    refresh_token = db.Column(db.String(), nullable=True)
     domain_id = db.Column(db.Integer, db.ForeignKey('domaincheck.id'),
                           nullable=False)
 

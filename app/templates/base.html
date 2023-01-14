@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <style>html{visibility: hidden;opacity:0;}</style>
     <!-- favicon -->
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <!-- custom css -->
@@ -20,23 +21,37 @@
     <div class="container">
     <nav class="navbar navbar-expand-lg bg-transparent">
       <div class="container-fluid">
-        <a class="navbar-brand" href="#">
+      {% if current_user %}
+          <a class="navbar-brand" href="{{ url_for('home') }}">
             <img src="{{ url_for('static', filename='nav-logo.svg') }}" alt="nav-logo" width="140" height="48">
         </a>
+              {% else %}
+          <a class="navbar-brand" href="{{ url_for('login') }}">
+            <img src="{{ url_for('static', filename='nav-logo.svg') }}" alt="nav-logo" width="140" height="48">
+        </a>
+              {% endif %}
+
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTogglerDemo02" aria-controls="navbarTogglerDemo02" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarTogglerDemo02">
           <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-            <li class="nav-item">
+
+              {% if current_user %}
+                  <li class="nav-item">
               <a class="nav-link {{ 'active' if active_page == 'home' else '' }}" aria-current="page" href="{{ url_for('home') }}">Home</a>
             </li>
+                  <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+            </li>
+              {% else %}
               <li class="nav-item">
               <a class="nav-link {{ 'active' if active_page == 'signup' else '' }}" href="{{ url_for('signup') }}">Register</a>
             </li>
             <li class="nav-item">
               <a class="nav-link {{ 'active' if active_page == 'login' else '' }}" href="{{ url_for('login') }}">Login</a>
             </li>
+              {% endif %}
           </ul>
 
         </div>
