@@ -123,3 +123,7 @@ def update(user_id):
     db.session.commit()
 
     return make_response('User updated successfully.', 200)
+
+
+if __name__ == '__main__':
+    app.run()
