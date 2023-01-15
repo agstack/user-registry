@@ -15,9 +15,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # over https. In production, this should always be set to True
 app.config["JWT_COOKIE_SECURE"] = True
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=1)
-app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(minutes=2)
-app.config['JWT_COOKIE_CSRF_PROTECT'] = True
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=10)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(minutes=30)
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 db = SQLAlchemy(app)
 
 from app.models import user, blackList, domainCheck

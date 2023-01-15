@@ -2,9 +2,9 @@ import jwt as pyjwt
 from app import app, db
 from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.models import user as userModel
-from utils import check_email, allowed_to_register, is_blacklisted
-from forms import SignupForm, LoginForm
+from app.models import user as userModel, domainCheck
+from utils import allowed_to_register, is_blacklisted
+from forms import SignupForm, LoginForm, UpdateForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
     JWTManager, current_user, \
@@ -147,7 +147,7 @@ def refresh():
     """
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
-    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
+    resp = make_response(redirect(request.referrer))
     user = userModel.User.query.filter_by(id=current_user.id).first()
     user.access_token = access_token
     db.session.commit()
@@ -155,33 +155,59 @@ def refresh():
     return resp
 
 
-@app.route('/user', methods=['PATCH'])
+@app.route('/update', methods=['GET', 'POST'])
 @jwt_required()
 def update():
-    body = request.get_json(force=True)
-    user = current_user
+    form = UpdateForm()
+    if form.validate_on_submit():
 
-    for key, value in body.items():
-        if key == 'email':
-            value = value.strip()
-            if not check_email(value):
-                return make_response('Please provide a valid email address', 400)
-            token_or_allowed = allowed_to_register(value)
+        # gets email and password
+        email = form.email.data
+        password = form.password.data
+        phone_num = form.phone_num.data
+        discoverable = form.discoverable.data
+        user_to_update = userModel.User.query.filter_by(email=current_user.email).first()
+        if email != current_user.email:
+            token_or_allowed = allowed_to_register(email)
             if not token_or_allowed:
-                return make_response('Blacklisted email', 401)
+                flash(message='This email is blacklisted', category='danger')
             else:
                 domain_id = token_or_allowed
-                setattr(user, key, value)
-                setattr(user, 'domain_id', domain_id)
 
-        elif key == 'password':
-            password = generate_password_hash(value)
-            setattr(user, key, password)
-        else:
-            setattr(user, key, value)
-    db.session.commit()
+                # checking for existing user
+                user = userModel.User.query \
+                    .filter_by(email=email) \
+                    .first()
+                if not user:
+                    # database ORM object
+                    user_to_update.email = email
+                    flash(message="Email address updated", category='info')
+                    if current_user.domain_id != domain_id:
+                        user_to_update.domain_id = domain_id
+                        if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(id=current_user.domain_id).first().belongs_to:
+                            if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
 
-    return make_response('User updated successfully.', 200)
+                                flash(message="Added to authorized domain list", category='info')
+
+                            elif domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
+                                flash(message="Removed from authorized domain list", category='warning')
+
+                else:
+
+                    flash(message=f'A user with email "{email}" already exists.', category='info')
+        if password != "" and not check_password_hash(user_to_update.password, password):
+            user_to_update.password = generate_password_hash(password)
+            flash(message="Password changed", category='info')
+        if phone_num != current_user.phone_num:
+            user_to_update.phone_num = phone_num
+            flash(message="Phone number updated", category='info')
+        if discoverable != current_user.discoverable:
+            user_to_update.discoverable = discoverable
+            flash(message="Discoverable field updated", category='info')
+
+        db.session.commit()
+
+    return render_template('update.html', form=form)
 
 
 @app.route("/logout", methods=["GET"])
