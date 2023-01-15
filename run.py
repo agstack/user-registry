@@ -3,7 +3,7 @@ from app import app, db
 from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import user as userModel
-from utils import check_email, allowed_to_register
+from utils import check_email, allowed_to_register, is_blacklisted
 from forms import SignupForm, LoginForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
@@ -63,6 +63,8 @@ def login():
 
         if not user:
             flash(message='You are not registered', category='danger')
+        elif is_blacklisted(email):
+            flash(message=f'"{email}" is blacklisted', category='danger')
         else:
 
             if check_password_hash(user.password, password):
