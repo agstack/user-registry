@@ -239,3 +239,7 @@ def check_if_token_revoked(jwt_header, jwt_payload: dict) -> bool:
         .one_or_none()
 
     return token is not None
+
+
+if __name__ == '__main__':
+    app.run()
