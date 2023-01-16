@@ -1,12 +1,15 @@
 from flask_wtf import FlaskForm
-from wtforms import (StringField, BooleanField,
-                     EmailField, PasswordField)
+from wtforms import (StringField, BooleanField, PasswordField)
 from wtforms.validators import InputRequired, Email, DataRequired, EqualTo, Regexp
 
 
 class SignupForm(FlaskForm):
-    email = EmailField('Email', validators=[InputRequired(), Email()])
-    phone_num = StringField('Phone Number', validators=[InputRequired()])
+    email = StringField('Email', validators=[InputRequired(), Email(message='Please provide a valid email')])
+    phone_num = StringField('Phone Number', validators=[DataRequired(), Regexp("^[0-9]{6,16}", message='Please '
+                                                                                                       'provide a '
+                                                                                                       'valid phone '
+                                                                                                       'number (e.g. '
+                                                                                                       '921234567890)')])
     password = PasswordField('New Password',
                              validators=[DataRequired(), Regexp("^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,}", message="Please follow the guidelines for a strong password")])
     confirm_pass = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password', message="Passwords "
@@ -18,6 +21,25 @@ class SignupForm(FlaskForm):
 
 
 class LoginForm(FlaskForm):
-    email = EmailField('Email', validators=[InputRequired(), Email()])
-    password = PasswordField('New Password',
+    email = StringField('Email', validators=[InputRequired(), Email(message='Enter a valid email')])
+    password = PasswordField('Password',
                              validators=[DataRequired()])
+
+
+
+class UpdateForm(FlaskForm):
+    email = StringField('Email', validators=[Email(message='Please provide a valid email')])
+    phone_num = StringField('Phone Number', validators=[Regexp("^[0-9]{6,16}", message='Please '
+                                                                                                       'provide a '
+                                                                                                       'valid phone '
+                                                                                                       'number (e.g. '
+                                                                                                       '921234567890)')])
+    password = PasswordField('New Password',
+                             validators=[Regexp("^((?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,})?",
+                                                                message="Please follow the guidelines for a strong password")])
+    confirm_pass = PasswordField('Confirm Password',
+                                 validators=[EqualTo('password', message="Passwords "
+                                                                                         "don't "
+                                                                                         "match!")])
+
+    discoverable = BooleanField('Do you want your profile to be discoverable?')

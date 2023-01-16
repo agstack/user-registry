@@ -25,6 +25,7 @@ class StagingConfig(Config):
 class DevelopmentConfig(Config):
     DEVELOPMENT = True
     DEBUG = True
+    DEVELOPMENT_BASE_URL = os.getenv('DEVELOPMENT_BASE_URL')
 
 
 class TestingConfig(Config):

@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+    <!-- Section: Design Block -->
+<section class="text-center">
+  <!-- Background image -->
+  <div class="p-5 bg-image" style="
+          background-color: #83a846;
+          background-repeat: no-repeat;
+          background-position: 50% 0%;
+          background-attachment: scroll;
+          background-image: url({{ url_for('static', filename='register.jpg') }}), linear-gradient( to right, #83a846, #0070e8 );
+         height: 600px;
+        "></div>
+  <!-- Background image -->
+<div class="container">
+  <div class="card mx-4 mx-md-5 shadow-5-strong" style="
+        margin-top: -450px;
+        margin-bottom: 5%;
+        background: hsla(0, 0%, 100%, 0.8);
+        backdrop-filter: blur(90px);
+        ">
+    <div class="card-body py-5 px-md-5">
+
+      <div class="row d-flex justify-content-center">
+        <div class="col-lg-8">
+          <h2 class="fw-bold mb-5">{% block form_heading %}{% endblock %}</h2>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul class="flashes">
+    {% for category, message in messages %}
+      <li class="alert alert-{{ category }}" role="alert">{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+          <form method="POST">
+              {{ form.csrf_token }}
+          {% block auth_form_content %}
+              {% endblock %}
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+</section>
+<!-- Section: Design Block -->
+{% endblock %}

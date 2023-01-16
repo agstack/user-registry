@@ -1,7 +1,46 @@
-{% extends 'base.html' %}
+{% extends 'auth-template.html' %}
+{% set active_page='login' %}
 {% block title %}
     Login
 {% endblock %}
-{% block content %}
-    <h3>Login</h3>
+{% block form_heading %}
+    Login
+{% endblock %}
+{% block auth_form_content %}
+    <!-- Email input -->
+
+    <div class="form-outline mb-4 text-start">
+        {{ form.email.label(class_="form-label ms-1") }}
+        {{ form.email(class_="form-control", placeholder_="Enter your email") }}
+     {% if form.email.errors %}
+    <ul>
+        {% for error in form.email.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+     {% endif %}
+    </div>
+
+    <!-- Password input -->
+
+    <div class="form-outline mb-4 text-start">
+        {{ form.password.label(class_="form-label ms-1") }}
+        {{ form.password(class_="form-control", placeholder_="Enter your password") }}
+
+    {% if form.password.errors %}
+    <ul>
+        {% for error in form.password.errors %}
+            <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+    </div>
+
+    <!-- Submit button -->
+  <input type="submit" class="btn btn-primary btn-block mb-4" value="Sign in">
+    <div class="text-center">
+      <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></p>
+
+    </div>
+<!-- Section: Design Block -->
 {% endblock %}
