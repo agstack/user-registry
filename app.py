@@ -1,5 +1,6 @@
 import jwt as pyjwt
 from app import app, db
+import requests
 from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import user as userModel, domainCheck
@@ -17,6 +18,28 @@ jwt = JWTManager(app, add_context_processor=True)
 @jwt_required()
 def home():
     return render_template('home.html')
+
+
+@app.route('/asset-registry-home')
+@jwt_required()
+def asset_registry_home():
+    """
+    To send tokens to asset-registry
+    """
+    access_token = request.cookies.get('access_token_cookie')
+    refresh_token = request.cookies.get('refresh_token_cookie')
+    tokens = {'access_token': access_token, 'refresh_token': refresh_token}
+    try:
+        res = requests.post(app.config['ASSET_REGISTRY_BASE_URL'], json=tokens, timeout=2)
+        res.raise_for_status()
+        if res.json() and res.json()['status'] == 200:
+            flash(message="Tokens successfully delivered", category='info')
+        else:
+            flash(message="Something went wrong", category='danger')
+    except requests.exceptions.ConnectionError:
+        flash(message="Connection refused", category='danger')
+
+    return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
 
 
 @jwt.unauthorized_loader
