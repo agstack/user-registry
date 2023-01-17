@@ -11,6 +11,7 @@ class Config(object):
     CSRF_ENABLED = True
     SECRET_KEY = os.getenv('SECRET_KEY')
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+    ASSET_REGISTRY_BASE_URL = os.getenv('ASSET_REGISTRY_BASE_URL')
 
 
 class ProductionConfig(Config):

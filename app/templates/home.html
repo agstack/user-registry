@@ -4,5 +4,21 @@
     Home
 {% endblock %}
 {% block content %}
-    <h3 class="d-flex justify-content-center align-items-center">Homepage</h3>
+    <h3 class="d-flex justify-content-center align-items-center mt-4">Homepage</h3>
+    <div class="d-flex justify-content-center align-items-center mt-4">
+
+        <a class="btn btn-primary btn-xl" href="{{ url_for('asset_registry_home') }}">Asset Registry</a>
+
+    </div>
+    <div class="container mt-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul class="flashes">
+    {% for category, message in messages %}
+      <li class="alert alert-{{ category }}" role="alert">{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+    </div>
 {% endblock %}
