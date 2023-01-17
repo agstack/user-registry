@@ -28,9 +28,9 @@ def asset_registry_home():
     """
     access_token = request.cookies.get('access_token_cookie')
     refresh_token = request.cookies.get('refresh_token_cookie')
-    tokens = {'access_token': access_token, 'refresh_token': refresh_token}
+    tokens = {'Authorization': 'Bearer ' + access_token}
     try:
-        res = requests.post(app.config['ASSET_REGISTRY_BASE_URL'], json=tokens, timeout=2)
+        res = requests.post(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
         res.raise_for_status()
         if res.json() and res.json()['status'] == 200:
             flash(message="Tokens successfully delivered", category='info')
