@@ -28,19 +28,28 @@ def asset_registry_home():
     """
     To send tokens to asset-registry
     """
+    if request.is_json:
+        # this will run if json request
+        json_req = True
+    else:
+        # this will run if website form request
+        json_req = False
     access_token = request.cookies.get('access_token_cookie')
-    refresh_token = request.cookies.get('refresh_token_cookie')
     tokens = {'Authorization': 'Bearer ' + access_token}
     try:
         res = requests.post(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
         res.raise_for_status()
         if res.json() and res.json()['status'] == 200:
-            flash(message="Tokens successfully delivered", category='info')
+            msg = "Tokens successfully delivered"
+            flash(message=msg, category='info')
         else:
-            flash(message="Something went wrong", category='danger')
+            msg = "Something went wrong"
+            flash(message=msg, category='danger')
     except requests.exceptions.ConnectionError:
-        flash(message="Connection refused", category='danger')
-
+        msg = "Connection refused"
+        flash(message=msg, category='danger')
+    if json_req:
+        return jsonify({'message': msg, 'token': tokens})
     return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
 
 
@@ -78,7 +87,16 @@ def expired_token_callback(callback, callback2):
 @app.route('/', methods=['GET', 'POST'])
 @jwt_required(optional=True)
 def login():
-    form = LoginForm()
+    try:
+        # this will run if json request
+        data = MultiDict(mapping=request.json)
+        json_req = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        form = LoginForm(data)
+    except BadRequest:
+        # this will run if website form request
+        json_req = False
+        form = LoginForm()
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
@@ -87,9 +105,11 @@ def login():
             .first()
 
         if not user:
-            flash(message='You are not registered', category='danger')
+            msg = 'You are not registered'
+            flash(message=msg, category='danger')
         elif is_blacklisted(email):
-            flash(message=f'"{email}" is blacklisted', category='danger')
+            msg = f'"{email}" is blacklisted'
+            flash(message=msg, category='danger')
         else:
 
             if check_password_hash(user.password, password):
@@ -100,11 +120,20 @@ def login():
                 user.access_token = access_token
                 user.refresh_token = refresh_token
                 db.session.commit()
+                if json_req:
+                    resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
+                    resp.set_cookie('access_token_cookie', access_token)
+                    resp.set_cookie('refresh_token_cookie', refresh_token)
+
+                    return resp
                 set_access_cookies(resp, access_token)
                 set_refresh_cookies(resp, refresh_token)
                 return resp
             else:
-                flash(message='Incorrect Password!', category='danger')
+                msg = 'Incorrect Password!'
+                flash(message=msg, category='danger')
+        if json_req:
+            return jsonify({"message": msg})
     return render_template('login.html', form=form)
 
 
@@ -197,7 +226,24 @@ def refresh():
 @app.route('/update', methods=['GET', 'POST'])
 @jwt_required()
 def update():
-    form = UpdateForm()
+    try:
+        data = MultiDict(mapping=request.json)
+        json_req = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        form = UpdateForm(data)
+        if form.email.data is None:
+            form.email.data = current_user.email
+        if form.phone_num.data is None:
+            form.phone_num.data = current_user.phone_num
+        if form.discoverable.data is None:
+            form.discoverable.data = current_user.discoverable
+        if form.password.data is None:
+            form.password.data = ""
+            form.confirm_pass.data = ""
+
+    except BadRequest:
+        json_req = False
+        form = UpdateForm()
     if form.validate_on_submit():
 
         # gets email and password
@@ -205,11 +251,14 @@ def update():
         password = form.password.data
         phone_num = form.phone_num.data
         discoverable = form.discoverable.data
+        json_msg = ""
         user_to_update = userModel.User.query.filter_by(email=current_user.email).first()
         if email != current_user.email:
             token_or_allowed = allowed_to_register(email)
             if not token_or_allowed:
-                flash(message='This email is blacklisted', category='danger')
+                msg = 'This email is blacklisted'
+                json_msg = json_msg + ". " + msg
+                flash(message=msg, category='danger')
             else:
                 domain_id = token_or_allowed
 
@@ -218,33 +267,50 @@ def update():
                     .filter_by(email=email) \
                     .first()
                 if not user:
-                    # database ORM object
                     user_to_update.email = email
-                    flash(message="Email address updated", category='info')
+                    msg = "Email address updated"
+                    json_msg = json_msg + ". " + msg
+                    flash(message=msg, category='info')
                     if current_user.domain_id != domain_id:
                         user_to_update.domain_id = domain_id
                         if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(id=current_user.domain_id).first().belongs_to:
                             if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
-
-                                flash(message="Added to authorized domain list", category='info')
+                                msg = "Added to authorized domain list"
+                                json_msg = json_msg + ". " + msg
+                                if not json_req:
+                                    flash(message=msg, category='info')
 
                             elif domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
-                                flash(message="Removed from authorized domain list", category='warning')
+                                msg = "Removed from authorized domain list"
+                                json_msg = json_msg + ". " + msg
+                                flash(message=msg, category='warning')
 
                 else:
-
-                    flash(message=f'A user with email "{email}" already exists.', category='info')
+                    msg = f'A user with email "{email}" already exists.'
+                    json_msg = json_msg + ". " + msg
+                    flash(message=msg, category='info')
         if password != "" and not check_password_hash(user_to_update.password, password):
             user_to_update.password = generate_password_hash(password)
-            flash(message="Password changed", category='info')
+            msg = "Password changed"
+            json_msg = json_msg + ". " + msg
+            flash(message=msg, category='info')
         if phone_num != current_user.phone_num:
             user_to_update.phone_num = phone_num
-            flash(message="Phone number updated", category='info')
+            msg = "Phone number updated"
+            json_msg = json_msg + ". " + msg
+            flash(message=msg, category='info')
         if discoverable != current_user.discoverable:
             user_to_update.discoverable = discoverable
-            flash(message="Discoverable field updated", category='info')
+            msg = "Discoverable field updated"
+            json_msg = json_msg + ". " + msg
+            flash(message=msg, category='info')
 
         db.session.commit()
+        if json_req:
+            if json_msg != "" and json_msg[0] == ".":
+                json_msg = json_msg[2:]
+                return jsonify({"message": json_msg}), 202
+            return jsonify({'message': "Nothing to be updated"}), 200
 
     return render_template('update.html', form=form)
 
