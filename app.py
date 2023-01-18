@@ -1,7 +1,9 @@
 import jwt as pyjwt
+from werkzeug.datastructures import MultiDict
+from werkzeug.exceptions import BadRequest
 from app import app, db
 import requests
-from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup
+from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import user as userModel, domainCheck
 from utils import allowed_to_register, is_blacklisted
@@ -109,7 +111,16 @@ def login():
 @app.route('/signup', methods=['GET', 'POST'])
 @jwt_required(optional=True)
 def signup():
-    form = SignupForm()
+    try:
+        # this will run if json request
+        data = MultiDict(mapping=request.json)
+        json_req = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        form = SignupForm(data)
+    except BadRequest:
+        # this will run if website form request
+        json_req = False
+        form = SignupForm()
     if form.validate_on_submit():
 
         # gets email and password
@@ -119,7 +130,8 @@ def signup():
         discoverable = form.discoverable.data
         token_or_allowed = allowed_to_register(email)
         if not token_or_allowed:
-            flash(message='This email is blacklisted', category='danger')
+            msg = 'This email is blacklisted'
+            flash(message=msg, category='danger')
         else:
             domain_id = token_or_allowed
 
@@ -138,12 +150,16 @@ def signup():
                 # insert user
                 db.session.add(user)
                 db.session.commit()
+                msg = 'Signed up'
+                if json_req:
+                    return jsonify({"message": msg})
                 return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
             else:
-
+                msg = 'A user with this email already exists'
                 flash(message=Markup(f'A user with email "{email}" already exists. Please  <a href="/" '
                                      f'class="alert-link">login</a>!'), category='info')
-
+        if json_req:
+            return jsonify({"message": msg})
     return render_template('signup.html', form=form)
 
 

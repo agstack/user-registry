@@ -18,6 +18,7 @@ app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=1)
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(minutes=2)
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
+app.config["WTF_CSRF_ENABLED"] = True
 db = SQLAlchemy(app)
 
 from app.models import user, blackList, domainCheck
