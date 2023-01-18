@@ -1,7 +1,7 @@
 import jwt as pyjwt
 from app import app, db
 import requests
-from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup
+from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import user as userModel, domainCheck
 from utils import allowed_to_register, is_blacklisted
@@ -123,7 +123,7 @@ def signup():
         else:
             domain_id = token_or_allowed
 
-        # checking for existing user
+            # checking for existing user
             user = userModel.User.query \
                 .filter_by(email=email) \
                 .first()
@@ -207,12 +207,16 @@ def update():
                     flash(message="Email address updated", category='info')
                     if current_user.domain_id != domain_id:
                         user_to_update.domain_id = domain_id
-                        if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(id=current_user.domain_id).first().belongs_to:
-                            if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
+                        if domainCheck.DomainCheck.query.filter_by(
+                                id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
+                                id=current_user.domain_id).first().belongs_to:
+                            if domainCheck.DomainCheck.query.filter_by(
+                                    id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
 
                                 flash(message="Added to authorized domain list", category='info')
 
-                            elif domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
+                            elif domainCheck.DomainCheck.query.filter_by(
+                                    id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
                                 flash(message="Removed from authorized domain list", category='warning')
 
                 else:
@@ -262,6 +266,19 @@ def check_if_token_revoked(jwt_header, jwt_payload: dict) -> bool:
         .one_or_none()
 
     return token is not None
+
+
+@app.route("/domains", methods=['GET'])
+def fetch_all_domains():
+    """
+    Fetching all the domains
+    """
+    domains = domainCheck.DomainCheck.query.all()
+    domains = [domain.domain for domain in domains]
+    return jsonify({
+        "Message": "All domains",
+        "Domains": domains
+    }), 200
 
 
 if __name__ == '__main__':
