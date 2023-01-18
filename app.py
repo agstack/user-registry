@@ -92,7 +92,8 @@ def login():
 
             if check_password_hash(user.password, password):
                 # generates the JWT Token
-                access_token = create_access_token(identity=user.id)
+                additional_claims = {"domain": email.split('@')[1]}
+                access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
                 resp = make_response(redirect(url_for('home')))
                 user.access_token = access_token
@@ -209,7 +210,7 @@ def update():
                         user_to_update.domain_id = domain_id
                         if domainCheck.DomainCheck.query.filter_by(
                                 id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
-                                id=current_user.domain_id).first().belongs_to:
+                            id=current_user.domain_id).first().belongs_to:
                             if domainCheck.DomainCheck.query.filter_by(
                                     id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
 
@@ -279,6 +280,27 @@ def fetch_all_domains():
         "Message": "All domains",
         "Domains": domains
     }), 200
+
+
+@app.route('/authority-token/', methods=['GET'])
+def get_authority_token():
+    try:
+        args = request.args
+        domain = args.get('domain')
+        authority_token = db.session.query(domainCheck.DomainCheck.authority_token).filter(
+            domainCheck.DomainCheck.domain == domain).first().authority_token
+        if not authority_token:
+            return make_response(jsonify({
+                "Message": "Authority token not found"
+            }), 404)
+        return make_response(jsonify({
+            "Message": f"Authority token fetched successfully for domain: {domain}",
+            "Authority Token": authority_token
+        }), 200)
+    except AttributeError:
+        return make_response(jsonify({
+            "Message": "Authority token not found."
+        }), 400)
 
 
 if __name__ == '__main__':
