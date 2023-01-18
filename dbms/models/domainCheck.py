@@ -1,4 +1,4 @@
-from app import db
+from dbms import db
 import enum
 from sqlalchemy_utils import ChoiceType
 

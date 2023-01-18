@@ -1,8 +1,8 @@
 import random
 import re
 import string
-from app.models import domainCheck, blackList
-from app import db
+from dbms.models import domainCheck, blackList
+from dbms import db
 
 
 # function for validating an Email

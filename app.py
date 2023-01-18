@@ -1,15 +1,22 @@
 import jwt as pyjwt
-from app import app, db
+from dbms import app, db
 import requests
+from flask_migrate import Migrate
+
 from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.models import user as userModel, domainCheck
+from dbms.models import user as userModel, domainCheck
 from utils import allowed_to_register, is_blacklisted
 from forms import SignupForm, LoginForm, UpdateForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
     JWTManager, current_user, \
     create_refresh_token, set_access_cookies, set_refresh_cookies, unset_access_cookies, unset_jwt_cookies
+
+from dbms.models import user, blackList, domainCheck
+
+migrate = Migrate(app, db)
+
 
 jwt = JWTManager(app, add_context_processor=True)
 

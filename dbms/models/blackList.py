@@ -1,4 +1,4 @@
-from app import db
+from dbms import db
 
 
 class BlackList(db.Model):

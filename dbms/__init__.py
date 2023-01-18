@@ -20,6 +20,4 @@ app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(minutes=2)
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 db = SQLAlchemy(app)
 
-from app.models import user, blackList, domainCheck
 
-migrate = Migrate(app, db)
