@@ -21,6 +21,4 @@ app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 app.config["WTF_CSRF_ENABLED"] = True
 db = SQLAlchemy(app)
 
-from app.models import user, blackList, domainCheck
 
-migrate = Migrate(app, db)

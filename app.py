@@ -1,17 +1,24 @@
 import jwt as pyjwt
 from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
-from app import app, db
+from dbms import app, db
 import requests
+from flask_migrate import Migrate
+
 from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.models import user as userModel, domainCheck
+from dbms.models import user as userModel, domainCheck
 from utils import allowed_to_register, is_blacklisted
 from forms import SignupForm, LoginForm, UpdateForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
     JWTManager, current_user, \
     create_refresh_token, set_access_cookies, set_refresh_cookies, unset_access_cookies, unset_jwt_cookies
+
+from dbms.models import user, blackList, domainCheck
+
+migrate = Migrate(app, db)
+
 
 jwt = JWTManager(app, add_context_processor=True)
 
@@ -114,7 +121,8 @@ def login():
 
             if check_password_hash(user.password, password):
                 # generates the JWT Token
-                access_token = create_access_token(identity=user.id)
+                additional_claims = {"domain": email.split('@')[1]}
+                access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
                 resp = make_response(redirect(url_for('home')))
                 user.access_token = access_token
@@ -164,7 +172,7 @@ def signup():
         else:
             domain_id = token_or_allowed
 
-        # checking for existing user
+            # checking for existing user
             user = userModel.User.query \
                 .filter_by(email=email) \
                 .first()
@@ -284,7 +292,17 @@ def update():
                                 msg = "Removed from authorized domain list"
                                 json_msg = json_msg + ". " + msg
                                 flash(message=msg, category='warning')
+                        if domainCheck.DomainCheck.query.filter_by(
+                                id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
+                            id=current_user.domain_id).first().belongs_to:
+                            if domainCheck.DomainCheck.query.filter_by(
+                                    id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
 
+                                flash(message="Added to authorized domain list", category='info')
+
+                            elif domainCheck.DomainCheck.query.filter_by(
+                                    id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
+                                flash(message="Removed from authorized domain list", category='warning')
                 else:
                     msg = f'A user with email "{email}" already exists.'
                     json_msg = json_msg + ". " + msg
@@ -344,6 +362,40 @@ def check_if_token_revoked(jwt_header, jwt_payload: dict) -> bool:
         .one_or_none()
 
     return token is not None
+
+
+@app.route("/domains", methods=['GET'])
+def fetch_all_domains():
+    """
+    Fetching all the domains
+    """
+    domains = domainCheck.DomainCheck.query.all()
+    domains = [domain.domain for domain in domains]
+    return jsonify({
+        "Message": "All domains",
+        "Domains": domains
+    }), 200
+
+
+@app.route('/authority-token/', methods=['GET'])
+def get_authority_token():
+    try:
+        args = request.args
+        domain = args.get('domain')
+        authority_token = db.session.query(domainCheck.DomainCheck.authority_token).filter(
+            domainCheck.DomainCheck.domain == domain).first().authority_token
+        if not authority_token:
+            return make_response(jsonify({
+                "Message": "Authority token not found"
+            }), 404)
+        return make_response(jsonify({
+            "Message": f"Authority token fetched successfully for domain: {domain}",
+            "Authority Token": authority_token
+        }), 200)
+    except AttributeError:
+        return make_response(jsonify({
+            "Message": "Authority token not found."
+        }), 400)
 
 
 if __name__ == '__main__':
