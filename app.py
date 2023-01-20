@@ -52,7 +52,7 @@ def asset_registry_home():
         else:
             msg = "Something went wrong"
             flash(message=msg, category='danger')
-    except requests.exceptions.ConnectionError:
+    except Exception as e:
         msg = "Connection refused"
         flash(message=msg, category='danger')
     if json_req:
