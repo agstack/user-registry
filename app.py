@@ -44,7 +44,7 @@ def asset_registry_home():
     access_token = request.cookies.get('access_token_cookie')
     tokens = {'Authorization': 'Bearer ' + access_token}
     try:
-        res = requests.post(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
+        res = requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
         res.raise_for_status()
         if res.json() and res.json()['status'] == 200:
             msg = "Tokens successfully delivered"
@@ -95,6 +95,7 @@ def expired_token_callback(callback, callback2):
 @jwt_required(optional=True)
 def login():
     try:
+        print('hello')
         # this will run if json request
         data = MultiDict(mapping=request.json)
         json_req = True
