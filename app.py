@@ -5,15 +5,15 @@ from dbms import app, db
 import requests
 from flask_migrate import Migrate
 
-from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup, jsonify
+from flask import Flask, make_response, request, render_template, flash, redirect, Markup, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from dbms.models import user as userModel, domainCheck
+from dbms.models import user as userModel
 from utils import allowed_to_register, is_blacklisted
 from forms import SignupForm, LoginForm, UpdateForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
     JWTManager, current_user, \
-    create_refresh_token, set_access_cookies, set_refresh_cookies, unset_access_cookies, unset_jwt_cookies
+    create_refresh_token, set_access_cookies, unset_access_cookies, unset_jwt_cookies
 
 from dbms.models import user, blackList, domainCheck
 
@@ -124,7 +124,7 @@ def login():
                 additional_claims = {"domain": email.split('@')[1]}
                 access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
-                resp = make_response(redirect(url_for('home')))
+                resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
                 user.access_token = access_token
                 user.refresh_token = refresh_token
                 db.session.commit()
@@ -134,8 +134,8 @@ def login():
                     resp.set_cookie('refresh_token_cookie', refresh_token)
 
                     return resp
-                set_access_cookies(resp, access_token)
-                set_refresh_cookies(resp, refresh_token)
+                resp.set_cookie('access_token_cookie', access_token, httponly=True, max_age=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
+                resp.set_cookie('refresh_token_cookie', refresh_token, httponly=True, max_age=app.config['JWT_REFRESH_TOKEN_EXPIRES'])
                 return resp
             else:
                 msg = 'Incorrect Password!'
@@ -261,7 +261,7 @@ def update():
         discoverable = form.discoverable.data
         json_msg = ""
         user_to_update = userModel.User.query.filter_by(email=current_user.email).first()
-        if email != current_user.email:
+        if email != "" and email != current_user.email:
             token_or_allowed = allowed_to_register(email)
             if not token_or_allowed:
                 msg = 'This email is blacklisted'
@@ -285,24 +285,13 @@ def update():
                             if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
                                 msg = "Added to authorized domain list"
                                 json_msg = json_msg + ". " + msg
-                                if not json_req:
-                                    flash(message=msg, category='info')
+                                flash(message=msg, category='info')
 
                             elif domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
                                 msg = "Removed from authorized domain list"
                                 json_msg = json_msg + ". " + msg
                                 flash(message=msg, category='warning')
-                        if domainCheck.DomainCheck.query.filter_by(
-                                id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
-                            id=current_user.domain_id).first().belongs_to:
-                            if domainCheck.DomainCheck.query.filter_by(
-                                    id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
 
-                                flash(message="Added to authorized domain list", category='info')
-
-                            elif domainCheck.DomainCheck.query.filter_by(
-                                    id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
-                                flash(message="Removed from authorized domain list", category='warning')
                 else:
                     msg = f'A user with email "{email}" already exists.'
                     json_msg = json_msg + ". " + msg
@@ -312,7 +301,7 @@ def update():
             msg = "Password changed"
             json_msg = json_msg + ". " + msg
             flash(message=msg, category='info')
-        if phone_num != current_user.phone_num:
+        if phone_num != "" and phone_num != current_user.phone_num:
             user_to_update.phone_num = phone_num
             msg = "Phone number updated"
             json_msg = json_msg + ". " + msg
