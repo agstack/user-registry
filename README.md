@@ -47,3 +47,7 @@ View the following list of user registry API Endpoints
 * /logout: Log out users.
 
 * /authority-token: Gets the authority token for a domain. 
+
+## Signing up
+
+Create a user account by selecting the **Sign up** link at the end of the _Login_ dialog box. The _Sign up now_ form appears. 
