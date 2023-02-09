@@ -4,8 +4,9 @@ from werkzeug.exceptions import BadRequest
 from dbms import app, db
 import requests
 from flask_migrate import Migrate
+import datetime
 
-from flask import Flask, make_response, request, render_template, flash, redirect, Markup, jsonify
+from flask import Flask, make_response, request, render_template, flash, redirect, Markup, jsonify, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbms.models import user as userModel
 from utils import allowed_to_register, is_blacklisted
@@ -15,10 +16,12 @@ from flask_jwt_extended import create_access_token, \
     JWTManager, current_user, \
     create_refresh_token, set_access_cookies, unset_access_cookies, unset_jwt_cookies
 
+from utils_activation.email import send_email
+from utils_activation.token import generate_confirmation_token, confirm_token
+
 from dbms.models import user, blackList, domainCheck
 
 migrate = Migrate(app, db)
-
 
 jwt = JWTManager(app, add_context_processor=True)
 
@@ -95,7 +98,6 @@ def expired_token_callback(callback, callback2):
 @jwt_required(optional=True)
 def login():
     try:
-        print('hello')
         # this will run if json request
         data = MultiDict(mapping=request.json)
         json_req = True
@@ -135,8 +137,10 @@ def login():
                     resp.set_cookie('refresh_token_cookie', refresh_token)
 
                     return resp
-                resp.set_cookie('access_token_cookie', access_token, httponly=True, max_age=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
-                resp.set_cookie('refresh_token_cookie', refresh_token, httponly=True, max_age=app.config['JWT_REFRESH_TOKEN_EXPIRES'])
+                resp.set_cookie('access_token_cookie', access_token, httponly=True,
+                                max_age=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
+                resp.set_cookie('refresh_token_cookie', refresh_token, httponly=True,
+                                max_age=app.config['JWT_REFRESH_TOKEN_EXPIRES'])
                 return resp
             else:
                 msg = 'Incorrect Password!'
@@ -183,11 +187,20 @@ def signup():
                     phone_num=phone_num,
                     email=email,
                     password=generate_password_hash(password),
-                    domain_id=domain_id
+                    domain_id=domain_id,
+                    activated=False,
+                    activated_on=None
                 )
                 # insert user
                 db.session.add(user)
                 db.session.commit()
+                token = generate_confirmation_token(user.email)
+                confirm_url = url_for('activate_email', token=token, _external=True)
+                html = render_template('activation-email.html', confirm_url=confirm_url)
+                subject = "Please confirm your email"
+                send_email(user.email, subject, html)
+                flash('A confirmation email has been sent via email.', 'success')
+                return redirect(url_for("main.home"))
                 msg = 'Signed up'
                 if json_req:
                     return jsonify({"message": msg})
@@ -199,6 +212,25 @@ def signup():
         if json_req:
             return jsonify({"message": msg})
     return render_template('signup.html', form=form)
+
+
+@app.route("/activate/<token>")
+@jwt_required()
+def activate_email(token):
+    try:
+        email = confirm_token(token)
+        user = userModel.User.query.filter_by(email=email).first_or_404()
+        if user.activated:
+            flash(message='Account already activated. Please login.', category='success')
+        else:
+            user.activated = True
+            user.activated_on = datetime.datetime.now()
+            db.session.add(user)
+            db.session.commit()
+            flash('You have activated your account. Thanks!', 'success')
+    except:
+        flash(message='The confirmation link is invalid or has expired.', category='danger')
+    return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
 
 
 @jwt.user_lookup_loader
@@ -282,13 +314,17 @@ def update():
                     flash(message=msg, category='info')
                     if current_user.domain_id != domain_id:
                         user_to_update.domain_id = domain_id
-                        if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(id=current_user.domain_id).first().belongs_to:
-                            if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
+                        if domainCheck.DomainCheck.query.filter_by(
+                                id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
+                            id=current_user.domain_id).first().belongs_to:
+                            if domainCheck.DomainCheck.query.filter_by(
+                                    id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
                                 msg = "Added to authorized domain list"
                                 json_msg = json_msg + ". " + msg
                                 flash(message=msg, category='info')
 
-                            elif domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
+                            elif domainCheck.DomainCheck.query.filter_by(
+                                    id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
                                 msg = "Removed from authorized domain list"
                                 json_msg = json_msg + ". " + msg
                                 flash(message=msg, category='warning')
