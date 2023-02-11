@@ -9,17 +9,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.config.update(dict(
-    DEBUG=True,
-    MAIL_SERVER='smtp.mail.outlook.com',
-    MAIL_PORT=587,
-    MAIL_USE_TLS=True,
-    MAIL_USE_SSL=False,
-    MAIL_USERNAME=os.environ['APP_MAIL_USERNAME'],
-    MAIL_PASSWORD=os.environ['APP_MAIL_PASSWORD'],
-    MAIL_DEFAULT_SENDER='your@email.com'
-))
+app.is_user_activated = False # global flag to check if user is activated
+
+# Email config settings
+app.config['MAIL_SERVER']='smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USERNAME'] = os.environ['APP_MAIL_USERNAME']
+app.config['MAIL_PASSWORD'] = os.environ['APP_MAIL_PASSWORD']
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
 mail = Mail(app)
+
 app.config.from_object(os.getenv('APP_SETTINGS'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]

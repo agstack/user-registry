@@ -16,17 +16,17 @@ class Config(object):
     ASSET_REGISTRY_BASE_URL = os.getenv('ASSET_REGISTRY_BASE_URL')
 
     # mail settings
-    MAIL_SERVER = 'smtp.googlemail.com'
-    MAIL_PORT = 465
-    MAIL_USE_TLS = False
-    MAIL_USE_SSL = True
+    MAIL_SERVER = 'smtp.gmail.com'
+    MAIL_PORT = 587
+    MAIL_USE_TLS = True
+    MAIL_USE_SSL = False
 
     # gmail authentication
     MAIL_USERNAME = os.environ['APP_MAIL_USERNAME']
     MAIL_PASSWORD = os.environ['APP_MAIL_PASSWORD']
 
     # mail accounts
-    MAIL_DEFAULT_SENDER = 'your@email.com'
+    MAIL_DEFAULT_SENDER = os.getenv('APP_MAIL_USERNAME')
 
 
 class ProductionConfig(Config):
