@@ -25,6 +25,12 @@ migrate = Migrate(app, db)
 
 jwt = JWTManager(app, add_context_processor=True)
 
+def get_identity_if_logedin():
+    try:
+        return get_jwt_identity()
+    except Exception:
+        pass
+
 
 @app.route('/home', methods=['GET', 'POST'])
 @jwt_required()
@@ -97,6 +103,9 @@ def expired_token_callback(callback, callback2):
 @app.route('/', methods=['GET', 'POST'])
 @jwt_required(optional=True)
 def login():
+    user = get_identity_if_logedin()
+    if user:
+        return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
     try:
         # this will run if json request
         data = MultiDict(mapping=request.json)
