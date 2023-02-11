@@ -35,7 +35,7 @@ def get_identity_if_logedin():
 @app.route('/home', methods=['GET', 'POST'])
 @jwt_required()
 def home():
-    return render_template('home.html')
+    return render_template('home.html', is_user_activated=app.is_user_activated)
 
 
 @app.route('/asset-registry-home')
@@ -76,7 +76,7 @@ def unauthorized_callback(callback):
     """
     flash(message='You need to login first!', category='warning')
 
-    return make_response(login(), 401)
+    return redirect(url_for("login", next=request.url))
 
 
 @jwt.expired_token_loader
@@ -116,6 +116,8 @@ def login():
         # this will run if website form request
         json_req = False
         form = LoginForm()
+    # next url for redirecting after login
+    next_url = form.next.data
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
@@ -130,13 +132,20 @@ def login():
             msg = f'"{email}" is blacklisted'
             flash(message=msg, category='danger')
         else:
-
+            # set global flag for user activation accordingly
+            if not user.activated:
+                app.is_user_activated = False
+            else:
+                app.is_user_activated = True
             if check_password_hash(user.password, password):
                 # generates the JWT Token
                 additional_claims = {"domain": email.split('@')[1]}
                 access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
-                resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
+                if next_url != 'None':
+                    resp = make_response(redirect(next_url))
+                else:
+                    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
                 user.access_token = access_token
                 user.refresh_token = refresh_token
                 db.session.commit()
@@ -197,7 +206,6 @@ def signup():
                     email=email,
                     password=generate_password_hash(password),
                     domain_id=domain_id,
-                    activated=False,
                     activated_on=None
                 )
                 # insert user
@@ -209,7 +217,7 @@ def signup():
                 subject = "Please confirm your email"
                 send_email(user.email, subject, html)
                 flash('A confirmation email has been sent via email.', 'success')
-                return redirect(url_for("main.home"))
+                return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
                 msg = 'Signed up'
                 if json_req:
                     return jsonify({"message": msg})
@@ -223,20 +231,27 @@ def signup():
     return render_template('signup.html', form=form)
 
 
-@app.route("/activate/<token>")
+@app.route('/activate/<token>')
 @jwt_required()
 def activate_email(token):
+    """
+    Activate the user account
+    """
     try:
         email = confirm_token(token)
-        user = userModel.User.query.filter_by(email=email).first_or_404()
-        if user.activated:
-            flash(message='Account already activated. Please login.', category='success')
+        if email == current_user.email:
+            user = userModel.User.query.filter_by(email=email).first_or_404()
+            if user.activated:
+                flash(message='Account already activated.', category='success')
+            else:
+                user.activated = True
+                user.activated_on = datetime.datetime.now()
+                db.session.add(user)
+                db.session.commit()
+                app.is_user_activated = True
+                flash('You have activated your account. Thanks!', 'success')
         else:
-            user.activated = True
-            user.activated_on = datetime.datetime.now()
-            db.session.add(user)
-            db.session.commit()
-            flash('You have activated your account. Thanks!', 'success')
+            flash(message="Invalid activation link!", category='danger')
     except:
         flash(message='The confirmation link is invalid or has expired.', category='danger')
     return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
@@ -431,6 +446,21 @@ def get_authority_token():
         return make_response(jsonify({
             "Message": "Authority token not found."
         }), 400)
+
+
+@app.route('/resend')
+@jwt_required(refresh=True)
+def resend_confirmation():
+    """
+    Resend the account activation email
+    """
+    token = generate_confirmation_token(current_user.email)
+    confirm_url = url_for('activate_email', token=token, _external=True)
+    html = render_template('activation-email.html', confirm_url=confirm_url)
+    subject = "Please confirm your email"
+    send_email(current_user.email, subject, html)
+    flash('A new confirmation email has been sent.', 'success')
+    return redirect(url_for('home'))
 
 
 if __name__ == '__main__':
