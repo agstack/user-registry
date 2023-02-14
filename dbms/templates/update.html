@@ -10,7 +10,7 @@
     <!-- Email input -->
     <div class="form-outline mb-4 text-start">
         {{ form.email.label(class_="form-label ms-1") }}
-        {{ form.email(class_="form-control", placeholder_="Enter your new email", value_=current_user.email) }}
+        {{ form.email(class_="form-control", placeholder_=current_user.email) }}
      {% if form.email.errors %}
     <ul>
         {% for error in form.email.errors %}
@@ -23,7 +23,7 @@
 
     <div class="form-outline mb-4 text-start">
         {{ form.phone_num.label(class_="form-label ms-1") }}
-        {{ form.phone_num(class_="form-control", placeholder_="Enter your new phone number", value_=current_user.phone_num) }}
+        {{ form.phone_num(class_="form-control", placeholder_=current_user.phone_num) }}
      {% if form.phone_num.errors %}
     <ul>
         {% for error in form.phone_num.errors %}
@@ -31,6 +31,9 @@
         {% endfor %}
     </ul>
 {% endif %}
+    <p class="text-muted ms-1">
+        Format for phone number: 921234567890
+    </p>
     </div>
 
     <!-- Password input -->

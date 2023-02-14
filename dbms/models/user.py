@@ -13,13 +13,17 @@ class User(db.Model):
     refresh_token = db.Column(db.String(), nullable=True)
     domain_id = db.Column(db.Integer, db.ForeignKey('domaincheck.id'),
                           nullable=False)
+    activated = db.Column(db.Boolean, nullable=True)
+    activated_on = db.Column(db.DateTime, nullable=True)
 
-    def __init__(self, phone_num, email, password, domain_id):
+    def __init__(self, phone_num, email, password, domain_id, activated_on):
         self.phone_num = phone_num
         self.email = email
         self.password = password
         self.discoverable = True  # default value True
         self.domain_id = domain_id
+        self.activated = False
+        self.activated_on = activated_on
 
     def __repr__(self):
         return '<id {}>'.format(self.id)

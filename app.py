@@ -4,29 +4,38 @@ from werkzeug.exceptions import BadRequest
 from dbms import app, db
 import requests
 from flask_migrate import Migrate
+import datetime
 
-from flask import Flask, make_response, request, render_template, flash, redirect, url_for, Markup, jsonify
+from flask import Flask, make_response, request, render_template, flash, redirect, Markup, jsonify, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
-from dbms.models import user as userModel, domainCheck
+from dbms.models import user as userModel
 from utils import allowed_to_register, is_blacklisted
 from forms import SignupForm, LoginForm, UpdateForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
     JWTManager, current_user, \
-    create_refresh_token, set_access_cookies, set_refresh_cookies, unset_access_cookies, unset_jwt_cookies
+    create_refresh_token, set_access_cookies, unset_access_cookies, unset_jwt_cookies
+
+from utils_activation.email import send_email
+from utils_activation.token import generate_confirmation_token, confirm_token
 
 from dbms.models import user, blackList, domainCheck
 
 migrate = Migrate(app, db)
 
-
 jwt = JWTManager(app, add_context_processor=True)
+
+def get_identity_if_logedin():
+    try:
+        return get_jwt_identity()
+    except Exception:
+        pass
 
 
 @app.route('/home', methods=['GET', 'POST'])
 @jwt_required()
 def home():
-    return render_template('home.html')
+    return render_template('home.html', is_user_activated=app.is_user_activated)
 
 
 @app.route('/asset-registry-home')
@@ -44,7 +53,7 @@ def asset_registry_home():
     access_token = request.cookies.get('access_token_cookie')
     tokens = {'Authorization': 'Bearer ' + access_token}
     try:
-        res = requests.post(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
+        res = requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
         res.raise_for_status()
         if res.json() and res.json()['status'] == 200:
             msg = "Tokens successfully delivered"
@@ -52,7 +61,7 @@ def asset_registry_home():
         else:
             msg = "Something went wrong"
             flash(message=msg, category='danger')
-    except requests.exceptions.ConnectionError:
+    except Exception as e:
         msg = "Connection refused"
         flash(message=msg, category='danger')
     if json_req:
@@ -68,7 +77,7 @@ def unauthorized_callback(callback):
     """
     flash(message='You need to login first!', category='warning')
 
-    return make_response(login(), 401)
+    return redirect(url_for("login", next=request.url))
 
 
 @jwt.expired_token_loader
@@ -95,6 +104,9 @@ def expired_token_callback(callback, callback2):
 @app.route('/', methods=['GET', 'POST'])
 @jwt_required(optional=True)
 def login():
+    user = get_identity_if_logedin()
+    if user:
+        return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
     try:
         # this will run if json request
         data = MultiDict(mapping=request.json)
@@ -105,6 +117,8 @@ def login():
         # this will run if website form request
         json_req = False
         form = LoginForm()
+    # next url for redirecting after login
+    next_url = form.next.data
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
@@ -119,13 +133,20 @@ def login():
             msg = f'"{email}" is blacklisted'
             flash(message=msg, category='danger')
         else:
-
+            # set global flag for user activation accordingly
+            if not user.activated:
+                app.is_user_activated = False
+            else:
+                app.is_user_activated = True
             if check_password_hash(user.password, password):
                 # generates the JWT Token
                 additional_claims = {"domain": email.split('@')[1]}
                 access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
-                resp = make_response(redirect(url_for('home')))
+                if next_url != 'None':
+                    resp = make_response(redirect(next_url))
+                else:
+                    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
                 user.access_token = access_token
                 user.refresh_token = refresh_token
                 db.session.commit()
@@ -135,8 +156,10 @@ def login():
                     resp.set_cookie('refresh_token_cookie', refresh_token)
 
                     return resp
-                set_access_cookies(resp, access_token)
-                set_refresh_cookies(resp, refresh_token)
+                resp.set_cookie('access_token_cookie', access_token, httponly=True,
+                                max_age=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
+                resp.set_cookie('refresh_token_cookie', refresh_token, httponly=True,
+                                max_age=app.config['JWT_REFRESH_TOKEN_EXPIRES'])
                 return resp
             else:
                 msg = 'Incorrect Password!'
@@ -183,11 +206,19 @@ def signup():
                     phone_num=phone_num,
                     email=email,
                     password=generate_password_hash(password),
-                    domain_id=domain_id
+                    domain_id=domain_id,
+                    activated_on=None
                 )
                 # insert user
                 db.session.add(user)
                 db.session.commit()
+                token = generate_confirmation_token(user.email)
+                confirm_url = url_for('activate_email', token=token, _external=True)
+                html = render_template('activation-email.html', confirm_url=confirm_url)
+                subject = "Please confirm your email"
+                send_email(user.email, subject, html)
+                flash('A confirmation email has been sent via email.', 'success')
+                return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
                 msg = 'Signed up'
                 if json_req:
                     return jsonify({"message": msg})
@@ -199,6 +230,32 @@ def signup():
         if json_req:
             return jsonify({"message": msg})
     return render_template('signup.html', form=form)
+
+
+@app.route('/activate/<token>')
+@jwt_required()
+def activate_email(token):
+    """
+    Activate the user account
+    """
+    try:
+        email = confirm_token(token)
+        if email == current_user.email:
+            user = userModel.User.query.filter_by(email=email).first_or_404()
+            if user.activated:
+                flash(message='Account already activated.', category='success')
+            else:
+                user.activated = True
+                user.activated_on = datetime.datetime.now()
+                db.session.add(user)
+                db.session.commit()
+                app.is_user_activated = True
+                flash('You have activated your account. Thanks!', 'success')
+        else:
+            flash(message="Invalid activation link!", category='danger')
+    except:
+        flash(message='The confirmation link is invalid or has expired.', category='danger')
+    return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
 
 
 @jwt.user_lookup_loader
@@ -262,7 +319,7 @@ def update():
         discoverable = form.discoverable.data
         json_msg = ""
         user_to_update = userModel.User.query.filter_by(email=current_user.email).first()
-        if email != current_user.email:
+        if email != "" and email != current_user.email:
             token_or_allowed = allowed_to_register(email)
             if not token_or_allowed:
                 msg = 'This email is blacklisted'
@@ -282,28 +339,21 @@ def update():
                     flash(message=msg, category='info')
                     if current_user.domain_id != domain_id:
                         user_to_update.domain_id = domain_id
-                        if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(id=current_user.domain_id).first().belongs_to:
-                            if domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
-                                msg = "Added to authorized domain list"
-                                json_msg = json_msg + ". " + msg
-                                if not json_req:
-                                    flash(message=msg, category='info')
-
-                            elif domainCheck.DomainCheck.query.filter_by(id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
-                                msg = "Removed from authorized domain list"
-                                json_msg = json_msg + ". " + msg
-                                flash(message=msg, category='warning')
                         if domainCheck.DomainCheck.query.filter_by(
                                 id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
                             id=current_user.domain_id).first().belongs_to:
                             if domainCheck.DomainCheck.query.filter_by(
                                     id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
-
-                                flash(message="Added to authorized domain list", category='info')
+                                msg = "Added to authorized domain list"
+                                json_msg = json_msg + ". " + msg
+                                flash(message=msg, category='info')
 
                             elif domainCheck.DomainCheck.query.filter_by(
                                     id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
-                                flash(message="Removed from authorized domain list", category='warning')
+                                msg = "Removed from authorized domain list"
+                                json_msg = json_msg + ". " + msg
+                                flash(message=msg, category='warning')
+
                 else:
                     msg = f'A user with email "{email}" already exists.'
                     json_msg = json_msg + ". " + msg
@@ -313,7 +363,7 @@ def update():
             msg = "Password changed"
             json_msg = json_msg + ". " + msg
             flash(message=msg, category='info')
-        if phone_num != current_user.phone_num:
+        if phone_num != "" and phone_num != current_user.phone_num:
             user_to_update.phone_num = phone_num
             msg = "Phone number updated"
             json_msg = json_msg + ". " + msg
@@ -397,6 +447,21 @@ def get_authority_token():
         return make_response(jsonify({
             "Message": "Authority token not found."
         }), 400)
+
+
+@app.route('/resend')
+@jwt_required(refresh=True)
+def resend_confirmation():
+    """
+    Resend the account activation email
+    """
+    token = generate_confirmation_token(current_user.email)
+    confirm_url = url_for('activate_email', token=token, _external=True)
+    html = render_template('activation-email.html', confirm_url=confirm_url)
+    subject = "Please confirm your email"
+    send_email(current_user.email, subject, html)
+    flash('A new confirmation email has been sent.', 'success')
+    return redirect(url_for('home'))
 
 
 if __name__ == '__main__':
