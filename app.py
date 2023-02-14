@@ -57,7 +57,8 @@ def asset_registry_home():
         flash(message=msg, category='danger')
     if json_req:
         return jsonify({'message': msg, 'token': tokens})
-    return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
+    return redirect(app.config['ASSET_REGISTRY_BASE_URL'], code=200)
+    # return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
 
 
 @jwt.unauthorized_loader
