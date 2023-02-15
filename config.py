@@ -14,6 +14,7 @@ class Config(object):
     SECRET_KEY = os.getenv('SECRET_KEY')
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
     ASSET_REGISTRY_BASE_URL = os.getenv('ASSET_REGISTRY_BASE_URL')
+    ASSET_REGISTRY_BASE_URL_FE = os.getenv('ASSET_REGISTRY_BASE_URL_FE')
 
     # mail settings
     MAIL_SERVER = 'smtp.gmail.com'

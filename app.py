@@ -25,6 +25,7 @@ migrate = Migrate(app, db)
 
 jwt = JWTManager(app, add_context_processor=True)
 
+
 def get_identity_if_logedin():
     try:
         return get_jwt_identity()
@@ -66,8 +67,7 @@ def asset_registry_home():
         flash(message=msg, category='danger')
     if json_req:
         return jsonify({'message': msg, 'token': tokens})
-    return redirect(app.config['ASSET_REGISTRY_BASE_URL'], code=200)
-    # return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
+    return redirect(app.config['ASSET_REGISTRY_BASE_URL_FE'], code=200)
 
 
 @jwt.unauthorized_loader
@@ -89,8 +89,9 @@ def expired_token_callback(callback, callback2):
         pyjwt.decode(ref_token, app.config['SECRET_KEY'], algorithms="HS256")
     except pyjwt.ExpiredSignatureError:
         resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
-        user.refresh_token = None
-        user.access_token = None
+        if user:
+            user.refresh_token = None
+            user.access_token = None
         db.session.commit()
         unset_jwt_cookies(resp)
         return resp
@@ -140,7 +141,7 @@ def login():
                 app.is_user_activated = True
             if check_password_hash(user.password, password):
                 # generates the JWT Token
-                additional_claims = {"domain": email.split('@')[1]}
+                additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
                 access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
                 if next_url != 'None':
@@ -251,6 +252,7 @@ def activate_email(token):
                 db.session.commit()
                 app.is_user_activated = True
                 flash('You have activated your account. Thanks!', 'success')
+                return make_response(redirect(url_for('logout')))
         else:
             flash(message="Invalid activation link!", category='danger')
     except:
@@ -396,6 +398,8 @@ def logout():
     user.refresh_token = None
     db.session.commit()
     resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
+    requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout',
+                 timeout=2)  # logout from Asset Registry as well
     unset_jwt_cookies(resp)
     return resp
 
