@@ -1,3 +1,4 @@
+import json
 import jwt as pyjwt
 from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
@@ -18,6 +19,7 @@ from flask_jwt_extended import create_access_token, \
 
 from utils_activation.email import send_email
 from utils_activation.token import generate_confirmation_token, confirm_token
+from utils import issue_auth_token
 
 from dbms.models import user, blackList, domainCheck
 
@@ -430,6 +432,40 @@ def fetch_all_domains():
         "Message": "All domains",
         "Domains": domains
     }), 200
+
+
+@app.route("/domains", methods=['POST'])
+def authorize_a_domain():
+    """
+    Authorize a domain, will have an authority token
+    """
+    try:
+        data = json.loads(request.data.decode('utf-8'))
+        domain = data.get('domain')
+        if not domain:
+            return make_response(jsonify({
+                "message": "Domain is required."
+            }), 400)
+        domain = domainCheck.DomainCheck.query.filter_by(
+            domain=domain).first()
+        if not domain:
+            return make_response(jsonify({
+                "message": "Domain not found."
+            }), 400)
+        if domain.authority_token:
+            return make_response(jsonify({
+                "message": "Domain already authorized."
+            }), 200)
+        issue_auth_token(domain)
+        return jsonify({
+            "Message": "Domain Authorized",
+            "Domain": domain.domain
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'message': 'Authorizing Domain Error',
+            'error': f'{e}'
+        }), 401
 
 
 @app.route('/authority-token/', methods=['GET'])
