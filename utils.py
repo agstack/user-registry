@@ -31,7 +31,7 @@ def allowed_to_register(email):
     """
     This function takes in an email and returns false if it is blacklisted. If the domain is already
     authorized, or it is blue-listed, it returns the domain_id. If the domain don't already exist in the database,
-    it issues a token and returns the domain_id
+    it creates a new domain with no token and as blue listed
     """
     if is_blacklisted(email):
         return False
@@ -41,7 +41,9 @@ def allowed_to_register(email):
             .filter_by(domain=domain) \
             .first().belongs_to
     except AttributeError:
-        issue_auth_token(domain)
+        add_domain = domainCheck.DomainCheck("1", domain, None)
+        db.session.add(add_domain)
+        db.session.commit()
         return domainCheck.DomainCheck.query \
             .filter_by(domain=domain).first().id
     if domain_belongs_to == domainCheck.ListType.authorized or domain_belongs_to == domainCheck.ListType.blue_list:
@@ -57,6 +59,7 @@ def issue_auth_token(domain):
     token = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
     while domainCheck.DomainCheck.query.filter_by(authority_token=token).first() is not None:
         token = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-    add_domain = domainCheck.DomainCheck("0", domain, token)
-    db.session.add(add_domain)
+    domain.authority_token = token
+    domain.belongs_to = "0"
+    db.session.add(domain)
     db.session.commit()
