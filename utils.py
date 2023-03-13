@@ -46,7 +46,7 @@ def allowed_to_register(email):
         db.session.commit()
         return domainCheck.DomainCheck.query \
             .filter_by(domain=domain).first().id
-    if domain_belongs_to == domainCheck.ListType.authorized or domain_belongs_to == domainCheck.ListType.blue_list:
+    if domain_belongs_to == domainCheck.ListType.authorized or domain_belongs_to == domainCheck.ListType.blocked_authority_list:
         return domainCheck.DomainCheck.query \
             .filter_by(domain=domain).first().id
 
