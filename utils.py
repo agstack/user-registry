@@ -19,9 +19,9 @@ def check_email(email):
 
 def is_blacklisted(email):
     """
-    This function takes in an email and checks if it exists in the blacklist or not
+    This function takes in an email and checks if it exists in the blocked list or not
     """
-    if blackList.BlackList.query.filter_by(email=email).first() is not None:
+    if blackList.BlockedUserEmails.query.filter_by(email=email).first() is not None:
         return True
     return False
 

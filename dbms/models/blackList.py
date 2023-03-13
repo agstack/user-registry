@@ -1,8 +1,8 @@
 from dbms import db
 
 
-class BlackList(db.Model):
-    __tablename__ = 'blacklist'
+class BlockedUserEmails(db.Model):
+    __tablename__ = 'blocked_user_email'
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String())
 
