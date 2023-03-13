@@ -353,7 +353,7 @@ def update():
                                 flash(message=msg, category='info')
 
                             elif domainCheck.DomainCheck.query.filter_by(
-                                    id=domain_id).first().belongs_to == domainCheck.ListType.blue_list:
+                                    id=domain_id).first().belongs_to == domainCheck.ListType.blocked_authority_list:
                                 msg = "Removed from authorized domain list"
                                 json_msg = json_msg + ". " + msg
                                 flash(message=msg, category='warning')
