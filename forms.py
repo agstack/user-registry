@@ -18,7 +18,8 @@ class SignupForm(FlaskForm):
 
     newsletter = BooleanField('Subscribe to our newsletter', default='checked')
     discoverable = BooleanField('Do you want your profile to be discoverable?', default='checked')
-
+    lng = StringField('lng', default='')
+    lat = StringField('lat', default='')
 
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[InputRequired(), Email(message='Enter a valid email')])

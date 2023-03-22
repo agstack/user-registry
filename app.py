@@ -2,8 +2,8 @@ import json
 import calendar
 
 import jwt as pyjwt
-import numpy as np
-import pandas as pd
+from shapely.geometry import Point
+import geopandas as gpd
 import plotly
 from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
@@ -193,7 +193,9 @@ def signup():
         json_req = False
         form = SignupForm()
     if form.validate_on_submit():
-
+        # get user lat lng
+        lat = form.lat.data
+        lng = form.lng.data
         # gets email and password
         email = form.email.data
         password = form.password.data
@@ -211,6 +213,17 @@ def signup():
                 .filter_by(email=email) \
                 .first()
             if not user:
+                country = ''
+                if discoverable:
+                    # read shp file for country
+                    worldShpFile = app.static_folder + '/99bfd9e7-bb42-4728-87b5-07f8c8ac631c2020328-1-1vef4ev.lu5nk.shp'
+                    wrs_gdf = gpd.read_file(worldShpFile)
+                    wrs_gdf = wrs_gdf.to_crs(4326)
+                    p = Point([lng, lat])
+                    try:
+                        country = wrs_gdf[wrs_gdf.contains(p)].reset_index(drop=True).CNTRY_NAME.iloc[0]
+                    except Exception as e:
+                        country = ''
                 # database ORM object
                 user = userModel.User(
                     phone_num=phone_num,
@@ -218,7 +231,7 @@ def signup():
                     password=generate_password_hash(password),
                     domain_id=domain_id,
                     activated_on=None,
-                    country=''
+                    country=country
                 )
                 # insert user
                 db.session.add(user)

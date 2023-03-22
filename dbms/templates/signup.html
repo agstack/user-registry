@@ -1,14 +1,30 @@
 {% extends 'auth-template.html' %}
 {% set active_page='signup' %}
+{% block script %}
+    <script>
+      function getLocation() {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(showPosition);
+        } else {
+          alert("Geolocation is not supported by this browser.");
+        }
+      }
+      function showPosition(position) {
+        document.getElementById("lat").value = position.coords.latitude;
+        document.getElementById("lng").value = position.coords.longitude;
+      }
+      getLocation();
+    </script>
+{% endblock %}
 {% block title %}
     Signup
 {% endblock %}
 {% block form_heading %}
     Sign up now
 {% endblock %}
+
 {% block auth_form_content %}
     <!-- Email input -->
-
     <div class="form-outline mb-4 text-start">
         {{ form.email.label(class_="form-label ms-1") }}
         {{ form.email(class_="form-control", placeholder_="Enter your email") }}
@@ -87,7 +103,8 @@
 {% endif %}
     </div>
 
-
+    <input type="hidden" name="lng" id="lng" value="">
+    <input type="hidden" name="lat" id="lat" value="">
     <!-- Submit button -->
   <input type="submit" class="btn btn-primary btn-block mb-4" value="Sign up">
     <div class="text-center">
