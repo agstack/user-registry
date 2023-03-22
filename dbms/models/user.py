@@ -1,4 +1,5 @@
 from dbms import db
+from datetime import datetime
 
 
 class User(db.Model):
@@ -15,8 +16,11 @@ class User(db.Model):
                           nullable=False)
     activated = db.Column(db.Boolean, nullable=True)
     activated_on = db.Column(db.DateTime, nullable=True)
+    country = db.Column(db.String(), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
-    def __init__(self, phone_num, email, password, domain_id, activated_on):
+    def __init__(self, phone_num, email, password, domain_id, activated_on, country):
         self.phone_num = phone_num
         self.email = email
         self.password = password
@@ -24,6 +28,7 @@ class User(db.Model):
         self.domain_id = domain_id
         self.activated = False
         self.activated_on = activated_on
+        self.country = country
 
     def __repr__(self):
         return '<id {}>'.format(self.id)

@@ -1,8 +1,10 @@
 import random
 import re
 import string
-from dbms.models import domainCheck, blackList
+from dbms.models import domainCheck, blackList, user as userModel
 from dbms import db
+from sqlalchemy import func
+from datetime import date, timedelta
 
 
 # function for validating an Email
@@ -24,7 +26,6 @@ def is_blacklisted(email):
     if blackList.BlackList.query.filter_by(email=email).first() is not None:
         return True
     return False
-
 
 
 def allowed_to_register(email):
@@ -51,7 +52,6 @@ def allowed_to_register(email):
             .filter_by(domain=domain).first().id
 
 
-
 def issue_auth_token(domain):
     """
     This function takes in a domain and issues a unique authority token for that domain
@@ -63,3 +63,37 @@ def issue_auth_token(domain):
     domain.belongs_to = "0"
     db.session.add(domain)
     db.session.commit()
+
+
+def get_row_count_by_month():
+    """
+    Fetch row count by month
+    :return:
+    """
+    end_date = date.today()
+    start_date = end_date - timedelta(days=365)
+    rows = (
+        db.session.query(
+            func.date_trunc('month', userModel.User.created_at).label('month'),
+            func.count().label('count')
+        )
+        .filter(userModel.User.created_at >= start_date)
+        .group_by(func.date_trunc('month', userModel.User.created_at))
+        .order_by(func.date_trunc('month', userModel.User.created_at))
+        .all()
+    )
+    data_by_month = [{'month': row.month.strftime('%B'), 'count': row.count} for row in rows]
+    return data_by_month
+
+
+def get_row_count_by_country():
+    """
+    Fetch row count by country
+    :return:
+    """
+    rows = (
+        db.session.query(userModel.User.country.label('country'), db.func.count().label('count')).group_by(
+            userModel.User.country).all()
+    )
+    count_by_country = [{'country': row.country, 'count': row.count} for row in rows]
+    return count_by_country
