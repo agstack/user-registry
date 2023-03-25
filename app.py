@@ -1,7 +1,14 @@
 import json
+import calendar
+
 import jwt as pyjwt
+import numpy as np
+import pandas as pd
+import plotly
 from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
+
+import utils
 from dbms import app, db
 import requests
 from flask_migrate import Migrate
@@ -210,7 +217,8 @@ def signup():
                     email=email,
                     password=generate_password_hash(password),
                     domain_id=domain_id,
-                    activated_on=None
+                    activated_on=None,
+                    country=''
                 )
                 # insert user
                 db.session.add(user)
@@ -502,6 +510,68 @@ def resend_confirmation():
     send_email(current_user.email, subject, html)
     flash('A new confirmation email has been sent.', 'success')
     return redirect(url_for('home'))
+
+
+@app.route('/dashboard', methods=['GET'])
+@jwt_required()
+def dashboard():
+    # total user count
+    user_count = userModel.User.query \
+        .count()
+    row_count_by_month = utils.get_row_count_by_month()
+    # count by month
+    current_month = datetime.datetime.now().month
+    last_12_months = [calendar.month_name[1:][i] for i in
+                      range(current_month - 12, current_month)]
+    last_12_months_count = [next((e['count'] for e in row_count_by_month if e['month'] == month), 0) for month in
+                            last_12_months]
+    # count by country
+    row_count_by_country = utils.get_row_count_by_country()
+    count = []
+    country = []
+    for element in row_count_by_country:
+        count.append(element['count'])
+        country.append(element['country'] if element['country'] else 'Other')
+    # graph plot
+    graphs = [
+        dict(
+            data=[
+                dict(
+                    x=last_12_months,
+                    y=last_12_months_count,
+                    type='bar'
+                ),
+            ],
+            layout=dict(
+                title='Registered Fields of last 12 month',
+                yaxis=dict(fixedrange=True),
+                xaxis=dict(fixedrange=True)
+            ),
+            config=dict(displayModeBar=False)
+        ),
+        dict(
+            data=[
+                dict(
+                    values=count,
+                    labels=country,
+                    type='pie'
+                ),
+            ],
+            layout=dict(
+                title='Registered Fields Country',
+                yaxis=dict(fixedrange=True),
+                xaxis=dict(fixedrange=True)
+            ), config=dict(displayModeBar=False)
+        )
+    ]
+
+    # Add "ids" to each of the graphs
+    ids = ['graph-{}'.format(i) for i, _ in enumerate(graphs)]
+    graphJSON = json.dumps(graphs, cls=plotly.utils.PlotlyJSONEncoder)
+
+    return render_template('dashboard.html',
+                           ids=ids,
+                           graphJSON=graphJSON, user_count=user_count)
 
 
 if __name__ == '__main__':
