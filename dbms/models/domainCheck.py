@@ -4,7 +4,7 @@ from sqlalchemy_utils import ChoiceType
 
 
 class ListType(enum.Enum):
-    blue_list = "1"
+    blocked_authority_list = "1"
     authorized = "0"
 
 

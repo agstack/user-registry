@@ -21,9 +21,9 @@ def check_email(email):
 
 def is_blacklisted(email):
     """
-    This function takes in an email and checks if it exists in the blacklist or not
+    This function takes in an email and checks if it exists in the blocked list or not
     """
-    if blackList.BlackList.query.filter_by(email=email).first() is not None:
+    if blackList.BlockedUserEmails.query.filter_by(email=email).first() is not None:
         return True
     return False
 
@@ -47,7 +47,7 @@ def allowed_to_register(email):
         db.session.commit()
         return domainCheck.DomainCheck.query \
             .filter_by(domain=domain).first().id
-    if domain_belongs_to == domainCheck.ListType.authorized or domain_belongs_to == domainCheck.ListType.blue_list:
+    if domain_belongs_to == domainCheck.ListType.authorized or domain_belongs_to == domainCheck.ListType.blocked_authority_list:
         return domainCheck.DomainCheck.query \
             .filter_by(domain=domain).first().id
 
