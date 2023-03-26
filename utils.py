@@ -97,3 +97,14 @@ def get_row_count_by_country():
     )
     count_by_country = [{'country': row.country, 'count': row.count} for row in rows]
     return count_by_country
+
+def get_row_count_by_domain():
+    """
+    Fetch row count by domain with Authority Token
+    :return:
+    """
+    try:
+        count = db.session.query(domainCheck.DomainCheck).filter(domainCheck.DomainCheck.authority_token.isnot(None)).count()
+        return count
+    except Exception as e:
+        raise e
