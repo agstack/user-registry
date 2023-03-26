@@ -108,3 +108,15 @@ def get_row_count_by_domain():
         return count
     except Exception as e:
         raise e
+
+def get_fields_count_by_domain(authority_tokens_list):
+    """
+    Fetch the fields count registered against the domains
+    :return:
+    """
+    try:
+        records = domainCheck.DomainCheck.query.filter(domainCheck.DomainCheck.authority_token.in_(authority_tokens_list)).all()
+        authority_token_dict = {record.authority_token: record.domain for record in records}
+        return authority_token_dict
+    except Exception as e:
+        raise e

@@ -594,5 +594,24 @@ def dashboard():
         }), 401
 
 
+@app.route("/fields-count-by-domain", methods=['POST'])
+def fields_count_by_domain():
+    """
+    Fetch the respective domains given the authority tokens
+    """
+    try:
+        data = json.loads(request.data.decode('utf-8'))
+        authority_token_dict = utils.get_fields_count_by_domain(data)
+        return jsonify({
+            "Message": "Authority Tokens Dictionary",
+            "authority_token_dict": authority_token_dict
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'message': 'Fetching Domains with authority tokens Error',
+            'error': f'{e}'
+        }), 401
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
