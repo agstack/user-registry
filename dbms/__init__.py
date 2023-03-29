@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import timedelta
 from flask_mail import Mail
 from flask_cors import CORS
+from flask_wtf.csrf import CSRFProtect
 
 from dotenv import load_dotenv
 
@@ -11,6 +12,7 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+csrf = CSRFProtect(app)
 app.is_user_activated = False # global flag to check if user is activated
 
 # Email config settings
