@@ -558,7 +558,7 @@ def dashboard():
                     ),
                 ],
                 layout=dict(
-                    title='Registered Fields of last 12 month',
+                    title='Registered Users of last 12 month',
                     yaxis=dict(fixedrange=True),
                     xaxis=dict(fixedrange=True)
                 ),
@@ -573,7 +573,7 @@ def dashboard():
                     ),
                 ],
                 layout=dict(
-                    title='Registered Fields Country',
+                    title='Registered Users Country',
                     yaxis=dict(fixedrange=True),
                     xaxis=dict(fixedrange=True)
                 ), config=dict(displayModeBar=False)
@@ -594,7 +594,7 @@ def dashboard():
         }), 401
 
 
-@app.route("/fields-count-by-domain", methods=['POST'])
+@app.route("/fields-count-by-domain", methods=['GET'])
 def fields_count_by_domain():
     """
     Fetch the respective domains given the authority tokens
@@ -610,7 +610,7 @@ def fields_count_by_domain():
         return jsonify({
             'message': 'Fetching Domains with authority tokens Error',
             'error': f'{e}'
-        }), 401
+        }), 400
 
 
 if __name__ == '__main__':
