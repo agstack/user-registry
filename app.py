@@ -600,7 +600,7 @@ def fields_count_by_domain():
     Fetch the respective domains given the authority tokens
     """
     try:
-        data = json.loads(request.data.decode('utf-8'))
+        data = eval(request.headers['authority_tokens'])
         authority_token_dict = utils.get_fields_count_by_domain(data)
         return jsonify({
             "Message": "Authority Tokens Dictionary",
