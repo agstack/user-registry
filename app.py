@@ -214,6 +214,7 @@ def signup():
                 .first()
             if not user:
                 country = ''
+                p = None
                 if discoverable:
                     # read shp file for country
                     worldShpFile = app.static_folder + '/99bfd9e7-bb42-4728-87b5-07f8c8ac631c2020328-1-1vef4ev.lu5nk.shp'
@@ -231,7 +232,8 @@ def signup():
                     password=generate_password_hash(password),
                     domain_id=domain_id,
                     activated_on=None,
-                    country=country
+                    country=country,
+                    lng_lat="{}, {}".format(p.x, p.y) if p else None
                 )
                 # insert user
                 db.session.add(user)
