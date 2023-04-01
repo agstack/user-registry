@@ -193,9 +193,6 @@ def signup():
         json_req = False
         form = SignupForm()
     if form.validate_on_submit():
-        # get user lat lng
-        lat = form.lat.data
-        lng = form.lng.data
         # gets email and password
         email = form.email.data
         password = form.password.data
@@ -216,6 +213,13 @@ def signup():
                 country = ''
                 p = None
                 if discoverable:
+                    # get user lat lng
+                    lat = form.lat.data
+                    lng = form.lng.data
+                    if not lat or not lng:
+                        msg = 'Allow Access to Location to be Discoverable.'
+                        flash(message=msg, category='danger')
+                        return render_template('signup.html', form=form)
                     # read shp file for country
                     worldShpFile = app.static_folder + '/99bfd9e7-bb42-4728-87b5-07f8c8ac631c2020328-1-1vef4ev.lu5nk.shp'
                     wrs_gdf = gpd.read_file(worldShpFile)
