@@ -17,11 +17,11 @@ class User(db.Model):
     activated = db.Column(db.Boolean, nullable=True)
     activated_on = db.Column(db.DateTime, nullable=True)
     country = db.Column(db.String(), nullable=True)
-    lng_lat = db.Column(db.String(), nullable=True)
+    lat_lng = db.Column(db.String(), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
-    def __init__(self, phone_num, email, password, domain_id, activated_on, country, lng_lat):
+    def __init__(self, phone_num, email, password, domain_id, activated_on, country, lat_lng):
         self.phone_num = phone_num
         self.email = email
         self.password = password
@@ -30,7 +30,7 @@ class User(db.Model):
         self.activated = False
         self.activated_on = activated_on
         self.country = country
-        self.lng_lat = lng_lat
+        self.lat_lng = lat_lng
 
     def __repr__(self):
         return '<id {}>'.format(self.id)

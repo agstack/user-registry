@@ -233,7 +233,7 @@ def signup():
                     domain_id=domain_id,
                     activated_on=None,
                     country=country,
-                    lng_lat="{}, {}".format(p.x, p.y) if p else None
+                    lat_lng="{}, {}".format(p.y, p.x) if p else None
                 )
                 # insert user
                 db.session.add(user)
