@@ -9,7 +9,7 @@ from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
 
 import utils
-from dbms import app, db
+from dbms import app, db, csrf
 import requests
 from flask_migrate import Migrate
 import datetime
@@ -27,7 +27,6 @@ from flask_jwt_extended import create_access_token, \
 from utils_activation.email import send_email
 from utils_activation.token import generate_confirmation_token, confirm_token
 from utils import issue_auth_token
-
 from dbms.models import user, blackList, domainCheck
 
 migrate = Migrate(app, db)
@@ -75,8 +74,8 @@ def asset_registry_home():
         msg = "Connection refused"
         flash(message=msg, category='danger')
     if json_req:
-        return jsonify({'message': msg, 'token': tokens})
-    return redirect(app.config['ASSET_REGISTRY_BASE_URL_FE'], code=200)
+        return jsonify({'message': msg, 'token': tokens}), 200
+    return redirect(app.config['ASSET_REGISTRY_BASE_URL_FE'], 200)
 
 
 @jwt.unauthorized_loader
@@ -113,10 +112,21 @@ def expired_token_callback(callback, callback2):
 
 @app.route('/', methods=['GET', 'POST'])
 @jwt_required(optional=True)
+@csrf.exempt
 def login():
     user = get_identity_if_logedin()
+    asset_registry = False
+    if request.method == 'POST':
+        try:
+            data = request.json
+            asset_registry = data.get('asset_registry', False)
+        except BadRequest:
+            asset_registry = False
     if user:
-        return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+        if not asset_registry:
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+        else:
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/asset-registry-home')
     try:
         # this will run if json request
         data = MultiDict(mapping=request.json)
@@ -153,14 +163,16 @@ def login():
                 additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
                 access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
-                if next_url != 'None':
+                if not asset_registry and next_url != 'None':
                     resp = make_response(redirect(next_url))
-                else:
+                elif not asset_registry:
                     resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
+                else:
+                    resp = make_response(jsonify({'access_token': access_token, 'refresh_token': refresh_token}))
                 user.access_token = access_token
                 user.refresh_token = refresh_token
                 db.session.commit()
-                if json_req:
+                if not asset_registry and json_req:
                     resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
                     resp.set_cookie('access_token_cookie', access_token)
                     resp.set_cookie('refresh_token_cookie', refresh_token)
@@ -175,7 +187,7 @@ def login():
                 msg = 'Incorrect Password!'
                 flash(message=msg, category='danger')
         if json_req:
-            return jsonify({"message": msg})
+            return make_response(jsonify({"message": msg}), 401)
     return render_template('login.html', form=form)
 
 
@@ -422,13 +434,23 @@ def logout():
     Endpoint for revoking the current users access token. Saved the unique
     identifier (jti) for the JWT into our database.
     """
+    print('here in ur logout')
     user = userModel.User.query.filter_by(id=current_user.id).first()
     user.access_token = None
     user.refresh_token = None
     db.session.commit()
-    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
-    requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout',
-                 timeout=2)  # logout from Asset Registry as well
+    try:
+        print(request)
+        asset_registry = request.json.get('asset_registry', False)
+        print('in asset', asset_registry)
+    except BadRequest:
+        resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
+        requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout',
+                     timeout=2)  # logout from Asset Registry as well
+        unset_jwt_cookies(resp)
+        print('failed')
+        return resp
+    resp = make_response(jsonify({"message": "Logged out"}), 200)
     unset_jwt_cookies(resp)
     return resp
 
