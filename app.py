@@ -9,7 +9,7 @@ from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
 
 import utils
-from dbms import app, db
+from dbms import app, db, csrf
 import requests
 from flask_migrate import Migrate
 import datetime
@@ -44,12 +44,14 @@ def get_identity_if_logedin():
 
 @app.route('/home', methods=['GET', 'POST'])
 @jwt_required()
+@csrf.exempt
 def home():
     return render_template('home.html', is_user_activated=app.is_user_activated)
 
 
 @app.route('/asset-registry-home')
 @jwt_required()
+@csrf.exempt
 def asset_registry_home():
     """
     To send tokens to asset-registry
@@ -113,6 +115,7 @@ def expired_token_callback(callback, callback2):
 
 @app.route('/', methods=['GET', 'POST'])
 @jwt_required(optional=True)
+@csrf.exempt
 def login():
     user = get_identity_if_logedin()
     if user:
@@ -181,6 +184,7 @@ def login():
 
 @app.route('/signup', methods=['GET', 'POST'])
 @jwt_required(optional=True)
+@csrf.exempt
 def signup():
     try:
         # this will run if json request
@@ -264,6 +268,7 @@ def signup():
 
 @app.route('/activate/<token>')
 @jwt_required()
+@csrf.exempt
 def activate_email(token):
     """
     Activate the user account
@@ -305,6 +310,7 @@ def user_lookup_callback(_jwt_header, jwt_data):
 
 @app.route("/refresh", methods=["GET"])
 @jwt_required(refresh=True)
+@csrf.exempt
 def refresh():
     """
     We are using the `refresh=True` options in jwt_required to only allow
@@ -322,6 +328,7 @@ def refresh():
 
 @app.route('/update', methods=['GET', 'POST'])
 @jwt_required()
+@csrf.exempt
 def update():
     try:
         data = MultiDict(mapping=request.json)
@@ -417,6 +424,7 @@ def update():
 
 @app.route("/logout", methods=["GET"])
 @jwt_required(refresh=True)
+@csrf.exempt
 def logout():
     """
     Endpoint for revoking the current users access token. Saved the unique
@@ -449,6 +457,7 @@ def check_if_token_revoked(jwt_header, jwt_payload: dict) -> bool:
 
 
 @app.route("/domains", methods=['GET'])
+@csrf.exempt
 def fetch_all_domains():
     """
     Fetching all the domains
@@ -462,6 +471,7 @@ def fetch_all_domains():
 
 
 @app.route("/domains", methods=['POST'])
+@csrf.exempt
 def authorize_a_domain():
     """
     Authorize a domain, will have an authority token
@@ -496,6 +506,7 @@ def authorize_a_domain():
 
 
 @app.route('/authority-token/', methods=['GET'])
+@csrf.exempt
 def get_authority_token():
     try:
         args = request.args
@@ -518,6 +529,7 @@ def get_authority_token():
 
 @app.route('/resend')
 @jwt_required(refresh=True)
+@csrf.exempt
 def resend_confirmation():
     """
     Resend the account activation email
@@ -533,6 +545,7 @@ def resend_confirmation():
 
 @app.route('/dashboard', methods=['GET'])
 @jwt_required()
+@csrf.exempt
 def dashboard():
     try:
         # total user count
@@ -601,6 +614,7 @@ def dashboard():
 
 
 @app.route("/fields-count-by-domain", methods=['GET'])
+@csrf.exempt
 def fields_count_by_domain():
     """
     Fetch the respective domains given the authority tokens
