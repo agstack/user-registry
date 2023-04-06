@@ -115,19 +115,19 @@ def expired_token_callback(callback, callback2):
 @jwt_required(optional=True)
 @csrf.exempt
 def login():
+    app.config["WTF_CSRF_ENABLED"] = False
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = False
+    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
+        postman_notebook_request = True
     user = get_identity_if_logedin()
     if user:
-        return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
-    try:
-        # this will run if json request
-        data = MultiDict(mapping=request.json)
-        json_req = True
-        app.config["WTF_CSRF_ENABLED"] = False
-        form = LoginForm(data)
-    except BadRequest:
-        # this will run if website form request
-        json_req = False
-        form = LoginForm()
+        if not postman_notebook_request:
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+        else:
+            return jsonify({'message': 'Already logged in'})
+    # this will run if website form request
+    form = LoginForm()
     # next url for redirecting after login
     next_url = form.next.data
     if form.validate_on_submit():
@@ -161,7 +161,7 @@ def login():
                 user.access_token = access_token
                 user.refresh_token = refresh_token
                 db.session.commit()
-                if json_req:
+                if postman_notebook_request:
                     resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
                     resp.set_cookie('access_token_cookie', access_token)
                     resp.set_cookie('refresh_token_cookie', refresh_token)
@@ -175,7 +175,7 @@ def login():
             else:
                 msg = 'Incorrect Password!'
                 flash(message=msg, category='danger')
-        if json_req:
+        if postman_notebook_request:
             return jsonify({"message": msg})
     return render_template('login.html', form=form)
 
@@ -431,15 +431,21 @@ def logout():
     Endpoint for revoking the current users access token. Saved the unique
     identifier (jti) for the JWT into our database.
     """
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = False
+    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
+        postman_notebook_request = True
     user = userModel.User.query.filter_by(id=current_user.id).first()
     user.access_token = None
     user.refresh_token = None
     db.session.commit()
-    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
-    requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout',
-                 timeout=2)  # logout from Asset Registry as well
-    unset_jwt_cookies(resp)
-    return resp
+    if not postman_notebook_request:
+        resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
+        requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout',
+                     timeout=2)  # logout from Asset Registry as well
+        unset_jwt_cookies(resp)
+        return resp
+    return jsonify({"message": "Successfully logged out"}), 200
 
 
 @jwt.token_in_blocklist_loader
