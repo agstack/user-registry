@@ -56,12 +56,10 @@ def asset_registry_home():
     """
     To send tokens to asset-registry
     """
-    if request.is_json:
-        # this will run if json request
-        json_req = True
-    else:
-        # this will run if website form request
-        json_req = False
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = False
+    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
+        postman_notebook_request = True
     access_token = request.cookies.get('access_token_cookie')
     tokens = {'Authorization': 'Bearer ' + access_token}
     try:
@@ -76,7 +74,7 @@ def asset_registry_home():
     except Exception as e:
         msg = "Connection refused"
         flash(message=msg, category='danger')
-    if json_req:
+    if postman_notebook_request:
         return jsonify({'message': msg, 'token': tokens})
     return redirect(app.config['ASSET_REGISTRY_BASE_URL_FE'], code=200)
 
@@ -186,16 +184,12 @@ def login():
 @jwt_required(optional=True)
 @csrf.exempt
 def signup():
-    try:
-        # this will run if json request
-        data = MultiDict(mapping=request.json)
-        json_req = True
-        app.config["WTF_CSRF_ENABLED"] = False
-        form = SignupForm(data)
-    except BadRequest:
-        # this will run if website form request
-        json_req = False
-        form = SignupForm()
+    app.config["WTF_CSRF_ENABLED"] = False
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = False
+    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
+        postman_notebook_request = True
+    form = SignupForm()
     if form.validate_on_submit():
         # gets email and password
         email = form.email.data
@@ -205,7 +199,10 @@ def signup():
         token_or_allowed = allowed_to_register(email)
         if not token_or_allowed:
             msg = 'This email is blacklisted'
-            flash(message=msg, category='danger')
+            if postman_notebook_request:
+                return jsonify({"message": msg})
+            else:
+                flash(message=msg, category='danger')
         else:
             domain_id = token_or_allowed
 
@@ -223,7 +220,10 @@ def signup():
                     if not lat or not lng:
                         msg = 'Allow Access to Location to be Discoverable.'
                         flash(message=msg, category='danger')
-                        return render_template('signup.html', form=form)
+                        if postman_notebook_request:
+                            return jsonify({"message": msg}), 400
+                        else:
+                            return render_template('signup.html', form=form), 400
                     # read shp file for country
                     worldShpFile = app.static_folder + '/99bfd9e7-bb42-4728-87b5-07f8c8ac631c2020328-1-1vef4ev.lu5nk.shp'
                     wrs_gdf = gpd.read_file(worldShpFile)
@@ -251,18 +251,19 @@ def signup():
                 html = render_template('activation-email.html', confirm_url=confirm_url)
                 subject = "Please confirm your email"
                 send_email(user.email, subject, html)
-                flash('A confirmation email has been sent via email.', 'success')
-                return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
-                msg = 'Signed up'
-                if json_req:
+                msg = 'A confirmation email has been sent via email.'
+                if postman_notebook_request:
                     return jsonify({"message": msg})
-                return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
+                else:
+                    flash(msg, 'success')
+                    return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
             else:
                 msg = 'A user with this email already exists'
-                flash(message=Markup(f'A user with email "{email}" already exists. Please  <a href="/" '
-                                     f'class="alert-link">login</a>!'), category='info')
-        if json_req:
-            return jsonify({"message": msg})
+                if postman_notebook_request:
+                    return jsonify({"message": msg})
+                else:
+                    flash(message=Markup(f'A user with email "{email}" already exists. Please  <a href="/" '
+                                         f'class="alert-link">login</a>!'), category='info')
     return render_template('signup.html', form=form)
 
 
@@ -534,12 +535,19 @@ def resend_confirmation():
     """
     Resend the account activation email
     """
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = False
+    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
+        postman_notebook_request = True
     token = generate_confirmation_token(current_user.email)
     confirm_url = url_for('activate_email', token=token, _external=True)
     html = render_template('activation-email.html', confirm_url=confirm_url)
     subject = "Please confirm your email"
     send_email(current_user.email, subject, html)
-    flash('A new confirmation email has been sent.', 'success')
+    msg = 'A new confirmation email has been sent.'
+    if postman_notebook_request:
+        return jsonify({"message": msg})
+    flash(msg, 'success')
     return redirect(url_for('home'))
 
 
