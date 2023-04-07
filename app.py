@@ -80,7 +80,11 @@ def unauthorized_callback(callback):
     """
     Missing auth header
     """
-    flash(message='You need to login first!', category='warning')
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+    if postman_notebook_request:
+        return jsonify({'message': 'Need to Login.'}), 401
+    flash(message='Need to Login.', category='warning')
 
     return redirect(url_for("login", next=request.url))
 
@@ -173,10 +177,8 @@ def login():
                     resp.set_cookie('refresh_token_cookie', refresh_token)
 
                     return resp
-                resp.set_cookie('access_token_cookie', access_token, httponly=True,
-                                max_age=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
-                resp.set_cookie('refresh_token_cookie', refresh_token, httponly=True,
-                                max_age=app.config['JWT_REFRESH_TOKEN_EXPIRES'])
+                resp.set_cookie('access_token_cookie', access_token)
+                resp.set_cookie('refresh_token_cookie', refresh_token)
                 return resp
             else:
                 msg = 'Incorrect Password!'
