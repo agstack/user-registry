@@ -98,16 +98,19 @@ def get_row_count_by_country():
     count_by_country = [{'country': row.country, 'count': row.count} for row in rows]
     return count_by_country
 
+
 def get_row_count_by_domain():
     """
     Fetch row count by domain with Authority Token
     :return:
     """
     try:
-        count = db.session.query(domainCheck.DomainCheck).filter(domainCheck.DomainCheck.authority_token.isnot(None)).count()
+        count = db.session.query(domainCheck.DomainCheck).filter(
+            domainCheck.DomainCheck.authority_token.isnot(None)).count()
         return count
     except Exception as e:
         raise e
+
 
 def get_fields_count_by_domain(authority_tokens_list):
     """
@@ -115,8 +118,19 @@ def get_fields_count_by_domain(authority_tokens_list):
     :return:
     """
     try:
-        records = domainCheck.DomainCheck.query.filter(domainCheck.DomainCheck.authority_token.in_(authority_tokens_list)).all()
+        records = domainCheck.DomainCheck.query.filter(
+            domainCheck.DomainCheck.authority_token.in_(authority_tokens_list)).all()
         authority_token_dict = {record.authority_token: record.domain for record in records}
         return authority_token_dict
+    except Exception as e:
+        raise e
+
+
+def check_non_web_user_agent(user_agent):
+    """
+    Check if the request is either from Postman or Notebook
+    """
+    try:
+        return 'Postman' in user_agent or 'python' in user_agent  # check if request from development user agents
     except Exception as e:
         raise e
