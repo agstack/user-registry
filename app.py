@@ -113,67 +113,73 @@ def expired_token_callback(callback, callback2):
 @jwt_required(optional=True)
 @csrf.exempt
 def login():
-    app.config["WTF_CSRF_ENABLED"] = False
-    user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
-    user = get_identity_if_logedin()
-    if user:
-        if not postman_notebook_request:
-            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
-        else:
-            return jsonify({'message': 'Already logged in'})
-    # this will run if website form request
-    form = LoginForm()
-    # next url for redirecting after login
-    next_url = form.next.data
-    if form.validate_on_submit():
-        email = form.email.data
-        password = form.password.data
-        user = userModel.User.query \
-            .filter_by(email=email) \
-            .first()
-
-        if not user:
-            msg = 'You are not registered'
-            flash(message=msg, category='danger')
-        elif is_blacklisted(email):
-            msg = f'"{email}" is blacklisted'
-            flash(message=msg, category='danger')
-        else:
-            # set global flag for user activation accordingly
-            if not user.activated:
-                app.is_user_activated = False
+    try:
+        app.config["WTF_CSRF_ENABLED"] = False
+        user_agent = request.headers.get('User-Agent')
+        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+        user = get_identity_if_logedin()
+        if user:
+            if not postman_notebook_request:
+                return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
             else:
-                app.is_user_activated = True
-            if check_password_hash(user.password, password):
-                # generates the JWT Token
-                additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
-                access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
-                refresh_token = create_refresh_token(identity=user.id)
-                if next_url != 'None':
-                    resp = make_response(redirect(next_url))
-                else:
-                    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
-                user.access_token = access_token
-                user.refresh_token = refresh_token
-                db.session.commit()
-                if postman_notebook_request:
-                    resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
-                    resp.set_cookie('access_token_cookie', access_token)
-                    resp.set_cookie('refresh_token_cookie', refresh_token)
+                return jsonify({'message': 'Already logged in'})
+        # this will run if website form request
+        form = LoginForm()
+        # next url for redirecting after login
+        next_url = form.next.data
+        if form.validate_on_submit():
+            email = form.email.data
+            password = form.password.data
+            user = userModel.User.query \
+                .filter_by(email=email) \
+                .first()
 
-                    return resp
-                resp.set_cookie('access_token_cookie', access_token, httponly=True,
-                                max_age=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
-                resp.set_cookie('refresh_token_cookie', refresh_token, httponly=True,
-                                max_age=app.config['JWT_REFRESH_TOKEN_EXPIRES'])
-                return resp
-            else:
-                msg = 'Incorrect Password!'
+            if not user:
+                msg = 'You are not registered'
                 flash(message=msg, category='danger')
-        if postman_notebook_request:
-            return jsonify({"message": msg})
-    return render_template('login.html', form=form)
+            elif is_blacklisted(email):
+                msg = f'"{email}" is blacklisted'
+                flash(message=msg, category='danger')
+            else:
+                # set global flag for user activation accordingly
+                if not user.activated:
+                    app.is_user_activated = False
+                else:
+                    app.is_user_activated = True
+                if check_password_hash(user.password, password):
+                    # generates the JWT Token
+                    additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
+                    access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
+                    refresh_token = create_refresh_token(identity=user.id)
+                    if next_url != 'None':
+                        resp = make_response(redirect(next_url))
+                    else:
+                        resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
+                    user.access_token = access_token
+                    user.refresh_token = refresh_token
+                    db.session.commit()
+                    if postman_notebook_request:
+                        resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
+                        resp.set_cookie('access_token_cookie', access_token)
+                        resp.set_cookie('refresh_token_cookie', refresh_token)
+
+                        return resp
+                    resp.set_cookie('access_token_cookie', access_token, httponly=True,
+                                    max_age=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
+                    resp.set_cookie('refresh_token_cookie', refresh_token, httponly=True,
+                                    max_age=app.config['JWT_REFRESH_TOKEN_EXPIRES'])
+                    return resp
+                else:
+                    msg = 'Incorrect Password!'
+                    flash(message=msg, category='danger')
+            if postman_notebook_request:
+                return jsonify({"message": msg})
+        return render_template('login.html', form=form)
+    except Exception as e:
+        return jsonify({
+            'message': 'User Registry Base Url Error',
+            'error': f'{e}'
+        }), 401
 
 
 @app.route('/signup', methods=['GET', 'POST'])
