@@ -57,9 +57,7 @@ def asset_registry_home():
     To send tokens to asset-registry
     """
     user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = False
-    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
-        postman_notebook_request = True
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     access_token = request.cookies.get('access_token_cookie')
     tokens = {'Authorization': 'Bearer ' + access_token}
     try:
@@ -117,9 +115,7 @@ def expired_token_callback(callback, callback2):
 def login():
     app.config["WTF_CSRF_ENABLED"] = False
     user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = False
-    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
-        postman_notebook_request = True
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     user = get_identity_if_logedin()
     if user:
         if not postman_notebook_request:
@@ -186,9 +182,7 @@ def login():
 def signup():
     app.config["WTF_CSRF_ENABLED"] = False
     user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = False
-    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
-        postman_notebook_request = True
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     form = SignupForm()
     if form.validate_on_submit():
         # gets email and password
@@ -275,23 +269,39 @@ def activate_email(token):
     Activate the user account
     """
     try:
+        user_agent = request.headers.get('User-Agent')
+        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
         email = confirm_token(token)
         if email == current_user.email:
             user = userModel.User.query.filter_by(email=email).first_or_404()
             if user.activated:
-                flash(message='Account already activated.', category='success')
+                msg = 'Account already activated.'
+                if postman_notebook_request:
+                    return jsonify({"message": msg})
+                flash(message=msg, category='success')
             else:
                 user.activated = True
                 user.activated_on = datetime.datetime.now()
                 db.session.add(user)
                 db.session.commit()
                 app.is_user_activated = True
-                flash('You have activated your account. Thanks!', 'success')
-                return make_response(redirect(url_for('logout')))
+                msg = 'You have activated your account. Thanks!'
+                if postman_notebook_request:
+                    return jsonify({"message": msg})
+                else:
+                    flash(msg, 'success')
+                    return make_response(redirect(url_for('logout')))
         else:
-            flash(message="Invalid activation link!", category='danger')
+            msg = "Invalid activation link!"
+            if postman_notebook_request:
+                return jsonify({"message": msg})
+            flash(message=msg, category='danger')
     except:
-        flash(message='The confirmation link is invalid or has expired.', category='danger')
+        msg = 'The confirmation link is invalid or has expired.'
+        if postman_notebook_request:
+            return jsonify({"message": msg})
+        else:
+            flash(message=msg, category='danger')
     return make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
 
 
@@ -317,9 +327,14 @@ def refresh():
     We are using the `refresh=True` options in jwt_required to only allow
     refresh tokens to access this route.
     """
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
-    resp = make_response(redirect(request.referrer))
+    if postman_notebook_request:
+        resp = make_response(jsonify({"access token": access_token}))
+    else:
+        resp = make_response(redirect(request.referrer))
     user = userModel.User.query.filter_by(id=current_user.id).first()
     user.access_token = access_token
     db.session.commit()
@@ -332,10 +347,10 @@ def refresh():
 @csrf.exempt
 def update():
     try:
-        data = MultiDict(mapping=request.json)
-        json_req = True
+        user_agent = request.headers.get('User-Agent')
+        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
         app.config["WTF_CSRF_ENABLED"] = False
-        form = UpdateForm(data)
+        form = UpdateForm()
         if form.email.data is None:
             form.email.data = current_user.email
         if form.phone_num.data is None:
@@ -346,81 +361,86 @@ def update():
             form.password.data = ""
             form.confirm_pass.data = ""
 
-    except BadRequest:
-        json_req = False
-        form = UpdateForm()
-    if form.validate_on_submit():
-
-        # gets email and password
-        email = form.email.data
-        password = form.password.data
-        phone_num = form.phone_num.data
-        discoverable = form.discoverable.data
-        json_msg = ""
-        user_to_update = userModel.User.query.filter_by(email=current_user.email).first()
-        if email != "" and email != current_user.email:
-            token_or_allowed = allowed_to_register(email)
-            if not token_or_allowed:
-                msg = 'This email is blacklisted'
-                json_msg = json_msg + ". " + msg
-                flash(message=msg, category='danger')
-            else:
-                domain_id = token_or_allowed
-
-                # checking for existing user
-                user = userModel.User.query \
-                    .filter_by(email=email) \
-                    .first()
-                if not user:
-                    user_to_update.email = email
-                    msg = "Email address updated"
+        if form.validate_on_submit():
+            # gets email and password
+            email = form.email.data
+            password = form.password.data
+            phone_num = form.phone_num.data
+            discoverable = form.discoverable.data
+            json_msg = ""
+            user_to_update = userModel.User.query.filter_by(email=current_user.email).first()
+            if email != "" and email != current_user.email:
+                token_or_allowed = allowed_to_register(email)
+                if not token_or_allowed:
+                    msg = 'This email is blacklisted'
                     json_msg = json_msg + ". " + msg
-                    flash(message=msg, category='info')
-                    if current_user.domain_id != domain_id:
-                        user_to_update.domain_id = domain_id
-                        if domainCheck.DomainCheck.query.filter_by(
-                                id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
-                            id=current_user.domain_id).first().belongs_to:
-                            if domainCheck.DomainCheck.query.filter_by(
-                                    id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
-                                msg = "Added to authorized domain list"
-                                json_msg = json_msg + ". " + msg
-                                flash(message=msg, category='info')
-
-                            elif domainCheck.DomainCheck.query.filter_by(
-                                    id=domain_id).first().belongs_to == domainCheck.ListType.blocked_authority_list:
-                                msg = "Removed from authorized domain list"
-                                json_msg = json_msg + ". " + msg
-                                flash(message=msg, category='warning')
-
+                    if postman_notebook_request:
+                        return jsonify({"message": json_msg})
+                    else:
+                        flash(message=msg, category='danger')
                 else:
-                    msg = f'A user with email "{email}" already exists.'
-                    json_msg = json_msg + ". " + msg
-                    flash(message=msg, category='info')
-        if password != "" and not check_password_hash(user_to_update.password, password):
-            user_to_update.password = generate_password_hash(password)
-            msg = "Password changed"
-            json_msg = json_msg + ". " + msg
-            flash(message=msg, category='info')
-        if phone_num != "" and phone_num != current_user.phone_num:
-            user_to_update.phone_num = phone_num
-            msg = "Phone number updated"
-            json_msg = json_msg + ". " + msg
-            flash(message=msg, category='info')
-        if discoverable != current_user.discoverable:
-            user_to_update.discoverable = discoverable
-            msg = "Discoverable field updated"
-            json_msg = json_msg + ". " + msg
-            flash(message=msg, category='info')
+                    domain_id = token_or_allowed
 
-        db.session.commit()
-        if json_req:
-            if json_msg != "" and json_msg[0] == ".":
-                json_msg = json_msg[2:]
-                return jsonify({"message": json_msg}), 202
-            return jsonify({'message': "Nothing to be updated"}), 200
+                    # checking for existing user
+                    user = userModel.User.query \
+                        .filter_by(email=email) \
+                        .first()
+                    if not user:
+                        user_to_update.email = email
+                        msg = "Email address updated"
+                        json_msg = json_msg + ". " + msg
+                        flash(message=msg, category='info')
+                        if current_user.domain_id != domain_id:
+                            user_to_update.domain_id = domain_id
+                            if domainCheck.DomainCheck.query.filter_by(
+                                    id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
+                                id=current_user.domain_id).first().belongs_to:
+                                if domainCheck.DomainCheck.query.filter_by(
+                                        id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
+                                    msg = "Added to authorized domain list"
+                                    json_msg = json_msg + ". " + msg
+                                    flash(message=msg, category='info')
 
-    return render_template('update.html', form=form)
+                                elif domainCheck.DomainCheck.query.filter_by(
+                                        id=domain_id).first().belongs_to == domainCheck.ListType.blocked_authority_list:
+                                    msg = "Removed from authorized domain list"
+                                    json_msg = json_msg + ". " + msg
+                                    flash(message=msg, category='warning')
+
+                    else:
+                        msg = f'A user with email "{email}" already exists.'
+                        json_msg = json_msg + ". " + msg
+                        flash(message=msg, category='info')
+            if password != "" and not check_password_hash(user_to_update.password, password):
+                user_to_update.password = generate_password_hash(password)
+                msg = "Password changed"
+                json_msg = json_msg + ". " + msg
+                flash(message=msg, category='info')
+            if phone_num != "" and phone_num != current_user.phone_num:
+                user_to_update.phone_num = phone_num
+                msg = "Phone number updated"
+                json_msg = json_msg + ". " + msg
+                flash(message=msg, category='info')
+            if discoverable != current_user.discoverable:
+                user_to_update.discoverable = discoverable
+                msg = "Discoverable field updated"
+                json_msg = json_msg + ". " + msg
+                flash(message=msg, category='info')
+
+            db.session.commit()
+            if postman_notebook_request:
+                if json_msg != "" and json_msg[0] == ".":
+                    json_msg = json_msg[2:]
+                    return jsonify({"message": json_msg}), 202
+                return jsonify({'message': "Nothing to be updated"}), 200
+        if postman_notebook_request:
+            return jsonify({"message": "Form validation failed"}), 400
+        return render_template('update.html', form=form)
+    except Exception as e:
+        return jsonify({
+            'message': 'Update User Error',
+            'error': f'{e}'
+        }), 401
 
 
 @app.route("/logout", methods=["GET"])
@@ -432,9 +452,7 @@ def logout():
     identifier (jti) for the JWT into our database.
     """
     user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = False
-    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
-        postman_notebook_request = True
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     user = userModel.User.query.filter_by(id=current_user.id).first()
     user.access_token = None
     user.refresh_token = None
@@ -445,7 +463,10 @@ def logout():
                      timeout=2)  # logout from Asset Registry as well
         unset_jwt_cookies(resp)
         return resp
-    return jsonify({"message": "Successfully logged out"}), 200
+    resp = make_response(jsonify({"message": "Successfully logged out"}), 200)
+    resp.set_cookie('access_token_cookie', '', expires=0)
+    resp.set_cookie('refresh_token_cookie', '', expires=0)
+    return resp
 
 
 @jwt.token_in_blocklist_loader
@@ -542,9 +563,7 @@ def resend_confirmation():
     Resend the account activation email
     """
     user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = False
-    if 'Postman' in user_agent or 'python' in user_agent:  # check if request from development user agents
-        postman_notebook_request = True
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     token = generate_confirmation_token(current_user.email)
     confirm_url = url_for('activate_email', token=token, _external=True)
     html = render_template('activation-email.html', confirm_url=confirm_url)
