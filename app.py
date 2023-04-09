@@ -5,7 +5,6 @@ import jwt as pyjwt
 from shapely.geometry import Point
 import geopandas as gpd
 import plotly
-from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
 
 import utils
@@ -27,7 +26,6 @@ from flask_jwt_extended import create_access_token, \
 from utils_activation.email import send_email
 from utils_activation.token import generate_confirmation_token, confirm_token
 from utils import issue_auth_token
-
 from dbms.models import user, blackList, domainCheck
 
 migrate = Migrate(app, db)
@@ -59,11 +57,12 @@ def asset_registry_home():
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     access_token = request.cookies.get('access_token_cookie')
-    tokens = {'Authorization': 'Bearer ' + access_token}
+    refresh_token = request.cookies.get('refresh_token_cookie')
+    tokens = {'Authorization': 'Bearer ' + access_token, 'refresh_token': refresh_token}
     try:
         res = requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
         res.raise_for_status()
-        if res.json() and res.json()['status'] == 200:
+        if res.json() and res.status_code == 200:
             msg = "Tokens successfully delivered"
             flash(message=msg, category='info')
         else:
@@ -82,7 +81,11 @@ def unauthorized_callback(callback):
     """
     Missing auth header
     """
-    flash(message='You need to login first!', category='warning')
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+    if postman_notebook_request:
+        return jsonify({'message': 'Need to Login.'}), 401
+    flash(message='Need to Login.', category='warning')
 
     return redirect(url_for("login", next=request.url))
 
@@ -94,7 +97,7 @@ def expired_token_callback(callback, callback2):
         filter_by(refresh_token=ref_token).first()
     try:
         pyjwt.decode(ref_token, app.config['SECRET_KEY'], algorithms="HS256")
-    except pyjwt.ExpiredSignatureError:
+    except:
         resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
         if user:
             user.refresh_token = None
@@ -103,7 +106,6 @@ def expired_token_callback(callback, callback2):
         unset_jwt_cookies(resp)
         return resp
     resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/refresh'))
-    user.access_token = None
     db.session.commit()
     unset_access_cookies(resp)
     return resp
@@ -113,73 +115,77 @@ def expired_token_callback(callback, callback2):
 @jwt_required(optional=True)
 @csrf.exempt
 def login():
-    try:
-        app.config["WTF_CSRF_ENABLED"] = False
-        user_agent = request.headers.get('User-Agent')
-        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
-        user = get_identity_if_logedin()
-        if user:
-            if not postman_notebook_request:
-                return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
-            else:
-                return jsonify({'message': 'Already logged in'})
-        # this will run if website form request
-        form = LoginForm()
-        # next url for redirecting after login
-        next_url = form.next.data
-        if form.validate_on_submit():
-            email = form.email.data
-            password = form.password.data
-            user = userModel.User.query \
-                .filter_by(email=email) \
-                .first()
+    app.config["WTF_CSRF_ENABLED"] = False
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+    user = get_identity_if_logedin()
+    asset_registry = False
+    if request.method == 'POST':
+        try:
+            data = request.json
+            asset_registry = data.get('asset_registry', False)
+        except BadRequest:
+            asset_registry = False
+    if user:
+        if not asset_registry and not postman_notebook_request:
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+        elif postman_notebook_request:
+            return jsonify({'message': 'Already logged in'})
+        else:
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/asset-registry-home')
 
-            if not user:
-                msg = 'You are not registered'
-                flash(message=msg, category='danger')
-            elif is_blacklisted(email):
-                msg = f'"{email}" is blacklisted'
-                flash(message=msg, category='danger')
+    # this will run if website form request
+    form = LoginForm()
+    # next url for redirecting after login
+    next_url = form.next.data
+    if form.validate_on_submit():
+        email = form.email.data
+        password = form.password.data
+        user = userModel.User.query \
+            .filter_by(email=email) \
+            .first()
+
+        if not user:
+            msg = 'You are not registered'
+            flash(message=msg, category='danger')
+        elif is_blacklisted(email):
+            msg = f'"{email}" is blacklisted'
+            flash(message=msg, category='danger')
+        else:
+            # set global flag for user activation accordingly
+            if not user.activated:
+                app.is_user_activated = False
             else:
-                # set global flag for user activation accordingly
-                if not user.activated:
-                    app.is_user_activated = False
+                app.is_user_activated = True
+            if check_password_hash(user.password, password):
+                # generates the JWT Token
+                additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
+                access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
+                refresh_token = create_refresh_token(identity=user.id)
+                if not asset_registry and next_url != 'None':
+                    resp = make_response(redirect(next_url))
+                elif not asset_registry:
+                    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
                 else:
-                    app.is_user_activated = True
-                if check_password_hash(user.password, password):
-                    # generates the JWT Token
-                    additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
-                    access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
-                    refresh_token = create_refresh_token(identity=user.id)
-                    if next_url != 'None':
-                        resp = make_response(redirect(next_url))
-                    else:
-                        resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
-                    user.access_token = access_token
-                    user.refresh_token = refresh_token
-                    db.session.commit()
-                    if postman_notebook_request:
-                        resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
-                        resp.set_cookie('access_token_cookie', access_token)
-                        resp.set_cookie('refresh_token_cookie', refresh_token)
+                    resp = make_response(jsonify({'access_token': access_token, 'refresh_token': refresh_token}))
+                user.access_token = access_token
+                user.refresh_token = refresh_token
+                db.session.commit()
+                if not asset_registry and postman_notebook_request:
+                    resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
+                    resp.set_cookie('access_token_cookie', access_token)
+                    resp.set_cookie('refresh_token_cookie', refresh_token)
 
-                        return resp
-                    resp.set_cookie('access_token_cookie', access_token, httponly=True,
-                                    max_age=app.config['JWT_ACCESS_TOKEN_EXPIRES'])
-                    resp.set_cookie('refresh_token_cookie', refresh_token, httponly=True,
-                                    max_age=app.config['JWT_REFRESH_TOKEN_EXPIRES'])
                     return resp
-                else:
-                    msg = 'Incorrect Password!'
-                    flash(message=msg, category='danger')
-            if postman_notebook_request:
-                return jsonify({"message": msg})
-        return render_template('login.html', form=form)
-    except Exception as e:
-        return jsonify({
-            'message': 'User Registry Base Url Error',
-            'error': f'{e}'
-        }), 401
+                resp.set_cookie('access_token_cookie', access_token)
+                resp.set_cookie('refresh_token_cookie', refresh_token)
+                return resp
+            else:
+                msg = 'Incorrect Password!'
+                flash(message=msg, category='danger')
+        if postman_notebook_request:
+            return jsonify({"message": msg})
+    return render_template('login.html', form=form)
 
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -274,9 +280,9 @@ def activate_email(token):
     """
     Activate the user account
     """
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     try:
-        user_agent = request.headers.get('User-Agent')
-        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
         email = confirm_token(token)
         if email == current_user.email:
             user = userModel.User.query.filter_by(email=email).first_or_404()
@@ -449,7 +455,7 @@ def update():
         }), 401
 
 
-@app.route("/logout", methods=["GET"])
+@app.route('/logout', methods=["GET"])
 @jwt_required(refresh=True)
 @csrf.exempt
 def logout():
@@ -465,11 +471,8 @@ def logout():
     db.session.commit()
     if not postman_notebook_request:
         resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
-        requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout',
-                     timeout=2)  # logout from Asset Registry as well
-        unset_jwt_cookies(resp)
-        return resp
-    resp = make_response(jsonify({"message": "Successfully logged out"}), 200)
+    else:
+        resp = make_response(jsonify({"message": "Successfully logged out"}), 200)
     resp.set_cookie('access_token_cookie', '', expires=0)
     resp.set_cookie('refresh_token_cookie', '', expires=0)
     return resp
