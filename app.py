@@ -162,7 +162,7 @@ def login():
                 additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
                 access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
-                tokens = {'Authorization': 'Bearer ' + access_token, 'refresh_token': refresh_token}
+                tokens = {'Authorization': 'Bearer ' + access_token, 'Refresh-Token': refresh_token}
                 try:
                     requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens)
                 except Exception as e:
