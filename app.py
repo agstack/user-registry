@@ -13,7 +13,7 @@ import requests
 from flask_migrate import Migrate
 import datetime
 
-from flask import Flask, make_response, request, render_template, flash, redirect, Markup, jsonify, url_for
+from flask import Flask, make_response, request, render_template, flash, redirect, Markup, jsonify, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbms.models import user as userModel
 from utils import allowed_to_register, is_blacklisted
@@ -57,11 +57,12 @@ def asset_registry_home():
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     access_token = request.cookies.get('access_token_cookie')
-    tokens = {'Authorization': 'Bearer ' + access_token}
+    refresh_token = request.cookies.get('refresh_token_cookie')
+    tokens = {'Authorization': 'Bearer ' + access_token, 'refresh_token': refresh_token}
     try:
         res = requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
         res.raise_for_status()
-        if res.json() and res.json()['status'] == 200:
+        if res.json() and res.status_code == 200:
             msg = "Tokens successfully delivered"
             flash(message=msg, category='info')
         else:
@@ -96,7 +97,7 @@ def expired_token_callback(callback, callback2):
         filter_by(refresh_token=ref_token).first()
     try:
         pyjwt.decode(ref_token, app.config['SECRET_KEY'], algorithms="HS256")
-    except pyjwt.ExpiredSignatureError:
+    except:
         resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
         if user:
             user.refresh_token = None
@@ -105,7 +106,6 @@ def expired_token_callback(callback, callback2):
         unset_jwt_cookies(resp)
         return resp
     resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/refresh'))
-    user.access_token = None
     db.session.commit()
     unset_access_cookies(resp)
     return resp
@@ -162,6 +162,14 @@ def login():
                 additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
                 access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
+                tokens = {'Authorization': 'Bearer ' + access_token, 'refresh_token': refresh_token}
+                try:
+                    requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens)
+                except Exception as e:
+                    return jsonify({
+                        'message': 'Fetch Session Cookies Error!',
+                        'error': f'{e}'
+                    }), 400
                 if not asset_registry and next_url != 'None':
                     resp = make_response(redirect(next_url))
                 elif not asset_registry:
@@ -175,7 +183,6 @@ def login():
                     resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
                     resp.set_cookie('access_token_cookie', access_token)
                     resp.set_cookie('refresh_token_cookie', refresh_token)
-
                     return resp
                 resp.set_cookie('access_token_cookie', access_token)
                 resp.set_cookie('refresh_token_cookie', refresh_token)
@@ -455,7 +462,7 @@ def update():
         }), 401
 
 
-@app.route("/logout", methods=["GET"])
+@app.route('/logout', methods=["GET"])
 @jwt_required(refresh=True)
 @csrf.exempt
 def logout():
@@ -466,16 +473,15 @@ def logout():
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     user = userModel.User.query.filter_by(id=current_user.id).first()
+    tokens = {'Authorization': 'Bearer ' + user.access_token, 'refresh_token': user.refresh_token}
+    requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout', headers=tokens)
     user.access_token = None
     user.refresh_token = None
     db.session.commit()
     if not postman_notebook_request:
         resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
-        requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout',
-                     timeout=2)  # logout from Asset Registry as well
-        unset_jwt_cookies(resp)
-        return resp
-    resp = make_response(jsonify({"message": "Successfully logged out"}), 200)
+    else:
+        resp = make_response(jsonify({"message": "Successfully logged out"}), 200)
     resp.set_cookie('access_token_cookie', '', expires=0)
     resp.set_cookie('refresh_token_cookie', '', expires=0)
     return resp
