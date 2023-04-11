@@ -470,21 +470,27 @@ def logout():
     Endpoint for revoking the current users access token. Saved the unique
     identifier (jti) for the JWT into our database.
     """
-    user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
-    user = userModel.User.query.filter_by(id=current_user.id).first()
-    tokens = {'Authorization': 'Bearer ' + user.access_token, 'refresh_token': user.refresh_token}
-    requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout', headers=tokens)
-    user.access_token = None
-    user.refresh_token = None
-    db.session.commit()
-    if not postman_notebook_request:
-        resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
-    else:
-        resp = make_response(jsonify({"message": "Successfully logged out"}), 200)
-    resp.set_cookie('access_token_cookie', '', expires=0)
-    resp.set_cookie('refresh_token_cookie', '', expires=0)
-    return resp
+    try:
+        user_agent = request.headers.get('User-Agent')
+        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+        user = userModel.User.query.filter_by(id=current_user.id).first()
+        tokens = {'Authorization': 'Bearer ' + user.access_token, 'Refresh-Token': user.refresh_token}
+        requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout', headers=tokens)
+        user.access_token = None
+        user.refresh_token = None
+        db.session.commit()
+        if not postman_notebook_request:
+            resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
+        else:
+            resp = make_response(jsonify({"message": "Successfully logged out"}), 200)
+        resp.set_cookie('access_token_cookie', '', expires=0)
+        resp.set_cookie('refresh_token_cookie', '', expires=0)
+        return resp
+    except Exception as e:
+        return jsonify({
+            'message': 'User Registry Logout Error',
+            'error': f'{e}'
+        }), 400
 
 
 @jwt.token_in_blocklist_loader
