@@ -59,18 +59,18 @@ def asset_registry_home():
     access_token = request.cookies.get('access_token_cookie')
     refresh_token = request.cookies.get('refresh_token_cookie')
     tokens = {'Authorization': 'Bearer ' + access_token, 'refresh_token': refresh_token}
-    try:
-        res = requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
-        res.raise_for_status()
-        if res.json() and res.status_code == 200:
-            msg = "Tokens successfully delivered"
-            flash(message=msg, category='info')
-        else:
-            msg = "Something went wrong"
-            flash(message=msg, category='danger')
-    except Exception as e:
-        msg = "Connection refused"
-        flash(message=msg, category='danger')
+    # try:
+    #     # res = requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens, timeout=2)
+    #     res.raise_for_status()
+    #     if res.json() and res.status_code == 200:
+    #         msg = "Tokens successfully delivered"
+    #         flash(message=msg, category='info')
+    #     else:
+    #         msg = "Something went wrong"
+    #         flash(message=msg, category='danger')
+    # except Exception as e:
+    #     msg = "Connection refused"
+    #     flash(message=msg, category='danger')
     if postman_notebook_request:
         return jsonify({'message': msg, 'token': tokens})
     return redirect(app.config['ASSET_REGISTRY_BASE_URL_FE'], code=200)
@@ -119,7 +119,7 @@ def login():
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     user = get_identity_if_logedin()
-    asset_registry = False
+    asset_registry = True
     if request.method == 'POST':
         try:
             data = request.json
@@ -127,12 +127,10 @@ def login():
         except BadRequest:
             asset_registry = False
     if user:
-        if not asset_registry and not postman_notebook_request:
+        if not postman_notebook_request:
             return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
         elif postman_notebook_request:
             return jsonify({'message': 'Already logged in'})
-        else:
-            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/asset-registry-home')
 
     # this will run if website form request
     form = LoginForm()
@@ -162,14 +160,15 @@ def login():
                 additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
                 access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
                 refresh_token = create_refresh_token(identity=user.id)
-                tokens = {'Authorization': 'Bearer ' + access_token, 'Refresh-Token': refresh_token}
-                try:
-                    requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens)
-                except Exception as e:
-                    return jsonify({
-                        'message': 'Fetch Session Cookies Error!',
-                        'error': f'{e}'
-                    }), 400
+                tokens = {'Authorization': 'Bearer ' + access_token, 'X-Refresh-Token': refresh_token}
+                if not asset_registry:
+                    try:
+                        requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens)
+                    except Exception as e:
+                        return jsonify({
+                            'message': 'Fetch Session Cookies Error!',
+                            'error': f'{e}'
+                        }), 400
                 if not asset_registry and next_url != 'None':
                     resp = make_response(redirect(next_url))
                 elif not asset_registry:
@@ -471,11 +470,13 @@ def logout():
     identifier (jti) for the JWT into our database.
     """
     try:
+        from_asset_registry = request.headers.get('X-FROM-ASSET-REGISTRY')
         user_agent = request.headers.get('User-Agent')
         postman_notebook_request = utils.check_non_web_user_agent(user_agent)
         user = userModel.User.query.filter_by(id=current_user.id).first()
-        tokens = {'Authorization': 'Bearer ' + user.access_token, 'Refresh-Token': user.refresh_token}
-        requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout', headers=tokens)
+        tokens = {'Authorization': 'Bearer ' + user.access_token, 'X-Refresh-Token': user.refresh_token}
+        if not from_asset_registry:
+            requests.get(app.config['ASSET_REGISTRY_BASE_URL'] + '/logout', headers=tokens)
         user.access_token = None
         user.refresh_token = None
         db.session.commit()
