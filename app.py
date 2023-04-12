@@ -72,7 +72,7 @@ def asset_registry_home():
     #     msg = "Connection refused"
     #     flash(message=msg, category='danger')
     if postman_notebook_request:
-        return jsonify({'message': msg, 'token': tokens})
+        return jsonify({'message': "", 'token': tokens})
     return redirect(app.config['ASSET_REGISTRY_BASE_URL_FE'], code=200)
 
 
