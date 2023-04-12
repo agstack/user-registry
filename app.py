@@ -119,78 +119,79 @@ def login():
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     user = get_identity_if_logedin()
-    asset_registry = True
-    if request.method == 'POST':
-        try:
-            data = request.json
-            asset_registry = data.get('asset_registry', False)
-        except BadRequest:
-            asset_registry = False
     if user:
         if not postman_notebook_request:
             return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
         elif postman_notebook_request:
             return jsonify({'message': 'Already logged in'})
 
+    asset_registry = False
     # this will run if website form request
     form = LoginForm()
     # next url for redirecting after login
     next_url = form.next.data
-    if form.validate_on_submit():
+    if request.headers.get('X-ASSET-REGISTRY') == 'True':
+        asset_registry = True
+        email = request.headers.get('X-EMAIL')
+        password = request.headers.get('X-PASSWORD')
+    elif form.validate_on_submit():
         email = form.email.data
         password = form.password.data
+
+
+    if not asset_registry and form.validate_on_submit() or asset_registry:
         user = userModel.User.query \
             .filter_by(email=email) \
             .first()
-
         if not user:
             msg = 'You are not registered'
             flash(message=msg, category='danger')
         elif is_blacklisted(email):
             msg = f'"{email}" is blacklisted'
             flash(message=msg, category='danger')
+
+        # set global flag for user activation accordingly
+        if not user.activated:
+            app.is_user_activated = False
         else:
-            # set global flag for user activation accordingly
-            if not user.activated:
-                app.is_user_activated = False
+            app.is_user_activated = True
+
+        if check_password_hash(user.password, password):
+            # generates the JWT Token
+            additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
+            access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
+            refresh_token = create_refresh_token(identity=user.id)
+            tokens = {'Authorization': 'Bearer ' + access_token, 'X-Refresh-Token': refresh_token}
+            if not asset_registry:
+                try:
+                    requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens)
+                except Exception as e:
+                    return jsonify({
+                        'message': 'Fetch Session Cookies Error!',
+                        'error': f'{e}'
+                    }), 400
+            if not asset_registry and next_url != 'None':
+                resp = make_response(redirect(next_url))
+            elif not asset_registry:
+                resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
             else:
-                app.is_user_activated = True
-            if check_password_hash(user.password, password):
-                # generates the JWT Token
-                additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
-                access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
-                refresh_token = create_refresh_token(identity=user.id)
-                tokens = {'Authorization': 'Bearer ' + access_token, 'X-Refresh-Token': refresh_token}
-                if not asset_registry:
-                    try:
-                        requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens)
-                    except Exception as e:
-                        return jsonify({
-                            'message': 'Fetch Session Cookies Error!',
-                            'error': f'{e}'
-                        }), 400
-                if not asset_registry and next_url != 'None':
-                    resp = make_response(redirect(next_url))
-                elif not asset_registry:
-                    resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
-                else:
-                    resp = make_response(jsonify({'access_token': access_token, 'refresh_token': refresh_token}))
-                user.access_token = access_token
-                user.refresh_token = refresh_token
-                db.session.commit()
-                if not asset_registry and postman_notebook_request:
-                    resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
-                    resp.set_cookie('access_token_cookie', access_token)
-                    resp.set_cookie('refresh_token_cookie', refresh_token)
-                    return resp
+                resp = make_response(jsonify({'access_token': access_token, 'refresh_token': refresh_token}))
+            user.access_token = access_token
+            user.refresh_token = refresh_token
+            db.session.commit()
+            if not asset_registry and postman_notebook_request:
+                resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
                 resp.set_cookie('access_token_cookie', access_token)
                 resp.set_cookie('refresh_token_cookie', refresh_token)
                 return resp
-            else:
-                msg = 'Incorrect Password!'
-                flash(message=msg, category='danger')
-        if postman_notebook_request:
-            return jsonify({"message": msg})
+            resp.set_cookie('access_token_cookie', access_token)
+            resp.set_cookie('refresh_token_cookie', refresh_token)
+            return resp
+        else:
+            msg = 'Incorrect Password!'
+            flash(message=msg, category='danger')
+    if postman_notebook_request:
+        return jsonify({"message": msg})
     return render_template('login.html', form=form)
 
 
