@@ -16,8 +16,8 @@ import datetime
 from flask import Flask, make_response, request, render_template, flash, redirect, Markup, jsonify, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbms.models import user as userModel
-from utils import allowed_to_register, is_blacklisted
-from forms import SignupForm, LoginForm, UpdateForm
+from utils import allowed_to_register, is_blacklisted, check_email
+from forms import SignupForm, LoginForm, UpdateForm, ForgotForm, PasswordResetForm
 from flask_jwt_extended import create_access_token, \
     get_jwt_identity, jwt_required, \
     JWTManager, current_user, \
@@ -692,5 +692,121 @@ def fields_count_by_domain():
         }), 400
 
 
+@app.route('/forgot-password', methods=['GET', 'POST'])
+@jwt_required(optional=True)
+@csrf.exempt
+def forgot_password():
+    app.config["WTF_CSRF_ENABLED"] = False
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+    
+    # check if already logged in
+    user = get_identity_if_logedin()
+    if user:
+        if not postman_notebook_request:
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+        elif postman_notebook_request:
+            return jsonify({'message': 'Already logged in'})  
+        
+    form = ForgotForm()
+    
+    # POST
+    if form.validate_on_submit():
+        # gets email and password
+        email = form.email.data
+        
+        # check account exists
+        user = userModel.User.query \
+            .filter_by(email=email) \
+            .first()    
+        if user:
+            # create email
+            token = generate_confirmation_token(email)
+            url = url_for('reset_password', token=token, _external=True)
+            html = render_template('reset-email.html', reset_url=url)
+            subject = 'Reset password'
+            
+            # send email
+            send_email(email, subject, html)
+            
+            # response
+            msg = 'A link to reset your password has been sent to your email!'
+            if postman_notebook_request:
+                return jsonify({"message": msg})
+            else:
+                flash(message=Markup(f'A password reset link has been sent to "{email}".'), category='info')
+        else:
+            # unregistered or unactivated account
+            msg = 'Account does not exist!'
+            if postman_notebook_request:
+                return jsonify({"message": msg})
+            else:
+                flash(message=Markup(f'A user with email "{email}" does not exist.'), category='danger')
+    
+    # GET       
+    return render_template('forgot-password.html', form=form)
+
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+@jwt_required(optional=True)
+@csrf.exempt
+def reset_password(token):
+    app.config["WTF_CSRF_ENABLED"] = False
+    user_agent = request.headers.get('User-Agent')
+    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+    
+    # check if already logged in
+    user = get_identity_if_logedin()
+    if user:
+        if not postman_notebook_request:
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+        elif postman_notebook_request:
+            return jsonify({'message': 'Already logged in'})  
+    
+    try:
+        # check if token is valid email
+        email = confirm_token(token)
+        
+        # check if user exists
+        user = userModel.User.query \
+            .filter_by(email=email) \
+            .first()
+        if user:
+            form = PasswordResetForm()
+            # POST
+            if form.validate_on_submit():
+                # get new password
+                password = form.password.data
+                user_to_update = userModel.User.query.filter_by(email=email).first()
+                
+                # check for new and old password
+                if check_password_hash(user_to_update.password, password):
+                    flash('We\'re sorry, but the new password you entered is the same as your previous password.', 'danger')
+                    return redirect(url_for("reset_password", token=token))
+                
+                user_to_update.password = generate_password_hash(password)
+                db.session.commit()
+                
+                # response
+                msg = 'Password updated succesfully!'
+                if postman_notebook_request:
+                    return jsonify({"message": msg})
+                else:
+                    flash(message=Markup(f'Password for email "{email}" has been updated.'), category='info')
+                    return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/')
+            
+            # GET
+            return render_template('reset-password.html', form=form)
+ 
+    except:
+        msg = 'The confirmation link is invalid or has expired.'
+        if postman_notebook_request:
+            return jsonify({"message": msg})
+        else:
+            flash(message=msg, category='danger')
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/forgot-password')   
+    
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', debug=True)

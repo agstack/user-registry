@@ -16,4 +16,4 @@ def send_email(to, subject, template):
         )
         mail.send(msg)
     except Exception as e:
-        return e;
+        return e
