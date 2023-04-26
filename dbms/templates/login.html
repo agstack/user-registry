@@ -45,9 +45,18 @@
 
     <!-- Submit button -->
     <input type="submit" class="btn btn-primary btn-block mb-4" value="Sign in">
+
+    <!-- Forgot password link -->
     <div class="text-center">
+        <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
+
+    </div>
+
+    <!-- Sign up link -->
+    <div class="text-center mt-2">
         <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></p>
 
     </div>
+
     <!-- Section: Design Block -->
 {% endblock %}

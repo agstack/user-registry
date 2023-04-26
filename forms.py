@@ -45,3 +45,15 @@ class UpdateForm(FlaskForm):
                                                                                          "match!")])
 
     discoverable = BooleanField('Do you want your profile to be discoverable?')
+
+
+class ForgotForm(FlaskForm):
+    email = StringField('Email', validators=[InputRequired(), Email(message='Enter a valid email')])
+    
+    
+class PasswordResetForm(FlaskForm):
+    password = PasswordField('New Password',
+                             validators=[DataRequired(), Regexp("^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,}", message="Please follow the guidelines for a strong password")])
+    confirm_pass = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password', message="Passwords "
+                                                                                                           "don't "
+                                                                                                           "match!")])
