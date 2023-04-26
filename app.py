@@ -767,7 +767,7 @@ def reset_password(token):
         # check if token is valid email
         email = confirm_token(token)
         
-        # checking if user exists
+        # check if user exists
         user = userModel.User.query \
             .filter_by(email=email) \
             .first()
@@ -778,6 +778,11 @@ def reset_password(token):
                 # get new password
                 password = form.password.data
                 user_to_update = userModel.User.query.filter_by(email=email).first()
+                
+                # check for new and old password
+                if check_password_hash(user_to_update.password, password):
+                    flash('We\'re sorry, but the new password you entered is the same as your previous password.', 'danger')
+                    return redirect(url_for("reset_password", token=token))
                 
                 user_to_update.password = generate_password_hash(password)
                 db.session.commit()
@@ -790,8 +795,9 @@ def reset_password(token):
                     flash(message=Markup(f'Password for email "{email}" has been updated.'), category='info')
                     return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/')
             
+            # GET
             return render_template('reset-password.html', form=form)
-         
+ 
     except:
         msg = 'The confirmation link is invalid or has expired.'
         if postman_notebook_request:
