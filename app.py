@@ -741,7 +741,7 @@ def forgot_password():
             if postman_notebook_request:
                 return jsonify({"message": msg})
             else:
-                flash(message=Markup(f'A user with email "{email}" does not exist.'), category='info')
+                flash(message=Markup(f'A user with email "{email}" does not exist.'), category='danger')
     
     # GET       
     return render_template('forgot-password.html', form=form)
