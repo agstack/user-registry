@@ -18,6 +18,8 @@ class User(db.Model):
     activated_on = db.Column(db.DateTime, nullable=True)
     country = db.Column(db.String(), nullable=True)
     lat_lng = db.Column(db.String(), nullable=True)
+    api_key = db.Column(db.String(), nullable=True)
+    client_secret = db.Column(db.String(), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
