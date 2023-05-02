@@ -138,7 +138,6 @@ def login():
         email = form.email.data
         password = form.password.data
 
-
     if not asset_registry and form.validate_on_submit() or asset_registry:
         user = userModel.User.query \
             .filter_by(email=email) \
@@ -301,10 +300,15 @@ def activate_email(token):
             else:
                 user.activated = True
                 user.activated_on = datetime.datetime.now()
+                user.api_key = utils.generate_secret_key()
+                user.client_secret = utils.generate_secret_key()
                 db.session.add(user)
                 db.session.commit()
                 app.is_user_activated = True
-                msg = 'You have activated your account. Thanks!'
+                html = render_template('api-keys-email.html', api_key=user.api_key, client_secret=user.client_secret)
+                subject = "API Keys"
+                send_email(user.email, subject, html)
+                msg = 'You have activated your account. API Keys are shared via email. Thanks!'
                 if postman_notebook_request:
                     return jsonify({"message": msg})
                 else:
@@ -592,6 +596,7 @@ def resend_confirmation():
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     token = generate_confirmation_token(current_user.email)
     confirm_url = url_for('activate_email', token=token, _external=True)
+    print(confirm_url)
     html = render_template('activation-email.html', confirm_url=confirm_url)
     subject = "Please confirm your email"
     send_email(current_user.email, subject, html)
@@ -699,36 +704,36 @@ def forgot_password():
     app.config["WTF_CSRF_ENABLED"] = False
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
-    
+
     # check if already logged in
     user = get_identity_if_logedin()
     if user:
         if not postman_notebook_request:
             return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
         elif postman_notebook_request:
-            return jsonify({'message': 'Already logged in'})  
-        
+            return jsonify({'message': 'Already logged in'})
+
     form = ForgotForm()
-    
+
     # POST
     if form.validate_on_submit():
         # gets email and password
         email = form.email.data
-        
+
         # check account exists
         user = userModel.User.query \
             .filter_by(email=email) \
-            .first()    
+            .first()
         if user:
             # create email
             token = generate_confirmation_token(email)
             url = url_for('reset_password', token=token, _external=True)
             html = render_template('reset-email.html', reset_url=url)
             subject = 'Reset password'
-            
+
             # send email
             send_email(email, subject, html)
-            
+
             # response
             msg = 'A link to reset your password has been sent to your email!'
             if postman_notebook_request:
@@ -742,7 +747,7 @@ def forgot_password():
                 return jsonify({"message": msg})
             else:
                 flash(message=Markup(f'A user with email "{email}" does not exist.'), category='danger')
-    
+
     # GET       
     return render_template('forgot-password.html', form=form)
 
@@ -754,19 +759,19 @@ def reset_password(token):
     app.config["WTF_CSRF_ENABLED"] = False
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
-    
+
     # check if already logged in
     user = get_identity_if_logedin()
     if user:
         if not postman_notebook_request:
             return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
         elif postman_notebook_request:
-            return jsonify({'message': 'Already logged in'})  
-    
+            return jsonify({'message': 'Already logged in'})
+
     try:
         # check if token is valid email
         email = confirm_token(token)
-        
+
         # check if user exists
         user = userModel.User.query \
             .filter_by(email=email) \
@@ -778,15 +783,16 @@ def reset_password(token):
                 # get new password
                 password = form.password.data
                 user_to_update = userModel.User.query.filter_by(email=email).first()
-                
+
                 # check for new and old password
                 if check_password_hash(user_to_update.password, password):
-                    flash('We\'re sorry, but the new password you entered is the same as your previous password.', 'danger')
+                    flash('We\'re sorry, but the new password you entered is the same as your previous password.',
+                          'danger')
                     return redirect(url_for("reset_password", token=token))
-                
+
                 user_to_update.password = generate_password_hash(password)
                 db.session.commit()
-                
+
                 # response
                 msg = 'Password updated succesfully!'
                 if postman_notebook_request:
@@ -794,18 +800,44 @@ def reset_password(token):
                 else:
                     flash(message=Markup(f'Password for email "{email}" has been updated.'), category='info')
                     return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/')
-            
+
             # GET
             return render_template('reset-password.html', form=form)
- 
+
     except:
         msg = 'The confirmation link is invalid or has expired.'
         if postman_notebook_request:
             return jsonify({"message": msg})
         else:
             flash(message=msg, category='danger')
-            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/forgot-password')   
-    
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/forgot-password')
+
+
+@app.route("/verify-api-secret-keys", methods=['POST'])
+@csrf.exempt
+def verify_api_secret_keys():
+    """
+    Verify if the API Key and the Client Secret are valid for a user
+    """
+    try:
+        data = json.loads(request.data.decode('utf-8'))
+        api_key = data.get('api_key')
+        client_secret = data.get('client_secret')
+        if not api_key or not client_secret:
+            return make_response(jsonify({
+                "message": "API Key and Client Secret are required."
+            }), 400)
+        record = userModel.User.query.filter_by(api_key=api_key, client_secret=client_secret).first()
+
+        if record:
+            return jsonify({'message': True})
+        else:
+            return jsonify({'message': False})
+    except Exception as e:
+        return jsonify({
+            'message': 'Verify API Keys Error',
+            'error': f'{e}'
+        }), 401
 
 
 if __name__ == '__main__':

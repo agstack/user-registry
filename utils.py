@@ -1,6 +1,7 @@
 import random
 import re
 import string
+import secrets
 from dbms.models import domainCheck, blackList, user as userModel
 from dbms import db
 from sqlalchemy import func
@@ -132,5 +133,17 @@ def check_non_web_user_agent(user_agent):
     """
     try:
         return 'Postman' in user_agent or 'python' in user_agent  # check if request from development user agents
+    except Exception as e:
+        raise e
+
+
+def generate_secret_key():
+    """
+    Generates a secret key
+    """
+    try:
+        # Generate a 32-byte random secret key
+        secret_key = secrets.token_hex(32)
+        return secret_key
     except Exception as e:
         raise e
