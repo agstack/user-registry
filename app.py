@@ -813,7 +813,7 @@ def reset_password(token):
             return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/forgot-password')
 
 
-@app.route("/verify-api-secret-keys", methods=['POST'])
+@app.route("/verify-api-secret-keys", methods=['GET'])
 @csrf.exempt
 def verify_api_secret_keys():
     """
