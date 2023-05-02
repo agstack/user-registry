@@ -820,9 +820,8 @@ def verify_api_secret_keys():
     Verify if the API Key and the Client Secret are valid for a user
     """
     try:
-        data = json.loads(request.data.decode('utf-8'))
-        api_key = data.get('api_key')
-        client_secret = data.get('client_secret')
+        api_key = request.headers.get('API-KEY')
+        client_secret = request.headers.get('CLIENT-SECRET')
         if not api_key or not client_secret:
             return make_response(jsonify({
                 "message": "API Key and Client Secret are required."
