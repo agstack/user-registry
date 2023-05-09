@@ -145,6 +145,8 @@ def get_bearer_token():
     bearer = request.headers.get('Authorization')  # Bearer JWT token here
     if bearer and len(bearer.split()) > 1:
         token = bearer.split()[1]  # JWT token
+    if not token and request.cookies.get('access_token_cookie'):  # check in cookies if not in headers
+        token = request.cookies.get('access_token_cookie')
     return token
 
 
