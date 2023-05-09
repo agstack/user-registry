@@ -6,9 +6,11 @@
 {% block content %}
     <h3 class="d-flex justify-content-center align-items-center mt-4">Homepage</h3>
     <div class="d-flex justify-content-center align-items-center mt-4">
-
         <a class="btn btn-primary btn-xl" href="{{ url_for('asset_registry_home') }}" target="_blank">Asset Registry</a>
     </div>
+    <div class="d-flex justify-content-center align-items-center mt-4"><a class="btn btn-info" href="
+                {{ url_for('generate_api_keys') }}">Generate API Key and Client Secret
+    </a></div>
     {% if not is_user_activated %}
         <div class="d-flex justify-content-center align-items-center mt-4"><a class="btn btn-info" href="
                 {{ url_for('resend_confirmation') }}">Resend Activation Email

@@ -839,5 +839,46 @@ def verify_api_secret_keys():
         }), 401
 
 
+@app.route("/generate-api-keys", methods=['GET'])
+@csrf.exempt
+@jwt_required()
+def generate_api_keys():
+    """
+    Generates the API Key and Client Secret for the logged-in user
+    Send email only if request is not from postman or notebook
+    """
+    try:
+        user_agent = request.headers.get('User-Agent')
+        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+        user_fetched = userModel.User.query.filter_by(email=current_user.email).first()
+        if user_fetched:
+            user_fetched.api_key = utils.generate_secret_key()
+            user_fetched.client_secret = utils.generate_secret_key()
+            db.session.commit()
+            if postman_notebook_request:
+                return jsonify({
+                    "Message": "Keys generated successfully",
+                    "api_key": user_fetched.api_key,
+                    "client_secret": user_fetched.client_secret
+                }), 200
+            else:
+                html = render_template('api-keys-email.html', api_key=user_fetched.api_key, client_secret=user_fetched.client_secret)
+                subject = "API Keys"
+                send_email(user_fetched.email, subject, html)
+                msg = 'API Keys are shared via email. Thanks!'
+                flash(msg, 'success')
+                return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+        else:
+            return jsonify({
+                "Message": "User not found!"
+            }), 404
+
+    except Exception as e:
+        return jsonify({
+            'message': 'Generating API Keys Error',
+            'error': f'{e}'
+        }), 400
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True)
