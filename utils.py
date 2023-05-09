@@ -2,10 +2,13 @@ import random
 import re
 import string
 import secrets
+from flask import request
+import jwt
 from dbms.models import domainCheck, blackList, user as userModel
-from dbms import db
+from dbms import db, app
 from sqlalchemy import func
 from datetime import date, timedelta
+from flask_jwt_extended import create_access_token
 
 
 # function for validating an Email
@@ -137,11 +140,35 @@ def check_non_web_user_agent(user_agent):
         raise e
 
 
-def generate_secret_key():
+def get_bearer_token():
+    token = None
+    bearer = request.headers.get('Authorization')  # Bearer JWT token here
+    if bearer and len(bearer.split()) > 1:
+        token = bearer.split()[1]  # JWT token
+    return token
+
+
+def get_domain_from_jwt():
+    """
+    Get domain of the logged in user
+    :return:
+    """
+    token = get_bearer_token()
+    domain = jwt.decode(token, app.config['SECRET_KEY'], algorithms="HS256")['domain']
+    return domain
+
+
+def generate_secret_key(client_secret=False):
     """
     Generates a secret key
+    Generates client secret as a JWT with logged-in user domain
+    Needs domain later on when registering a field in Asset Registry
     """
     try:
+        if client_secret:
+            domain = get_domain_from_jwt()
+            client_secret_key = create_access_token(identity=domain, expires_delta=False)
+            return client_secret_key
         # Generate a 32-byte random secret key
         secret_key = secrets.token_hex(32)
         return secret_key

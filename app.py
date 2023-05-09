@@ -301,7 +301,7 @@ def activate_email(token):
                 user.activated = True
                 user.activated_on = datetime.datetime.now()
                 user.api_key = utils.generate_secret_key()
-                user.client_secret = utils.generate_secret_key()
+                user.client_secret = utils.generate_secret_key(True)
                 db.session.add(user)
                 db.session.commit()
                 app.is_user_activated = True
@@ -853,7 +853,7 @@ def generate_api_keys():
         user_fetched = userModel.User.query.filter_by(email=current_user.email).first()
         if user_fetched:
             user_fetched.api_key = utils.generate_secret_key()
-            user_fetched.client_secret = utils.generate_secret_key()
+            user_fetched.client_secret = utils.generate_secret_key(True)
             db.session.commit()
             if postman_notebook_request:
                 return jsonify({
