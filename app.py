@@ -594,6 +594,13 @@ def resend_confirmation():
     """
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+    user = userModel.User.query.filter_by(email=current_user.email).first_or_404()
+    if user.activated:
+        msg = 'Account already activated.'
+        if postman_notebook_request:
+            return jsonify({"message": msg})
+        flash(message=msg, category='info')
+        return redirect(url_for('home'))
     token = generate_confirmation_token(current_user.email)
     confirm_url = url_for('activate_email', token=token, _external=True)
     print(confirm_url)

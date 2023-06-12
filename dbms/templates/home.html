@@ -11,11 +11,9 @@
     <div class="d-flex justify-content-center align-items-center mt-4"><a class="btn btn-info" href="
                 {{ url_for('generate_api_keys') }}">Generate API Key and Client Secret
     </a></div>
-    {% if not is_user_activated %}
-        <div class="d-flex justify-content-center align-items-center mt-4"><a class="btn btn-info" href="
-                {{ url_for('resend_confirmation') }}">Resend Activation Email
-        </a></div>
-    {% endif %}
+    <div class="d-flex justify-content-center align-items-center mt-4"><a class="btn btn-info" href="
+            {{ url_for('resend_confirmation') }}">Resend Activation Email
+    </a></div>
     <div class="container mt-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
