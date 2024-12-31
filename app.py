@@ -123,7 +123,13 @@ def login():
         if not postman_notebook_request:
             return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
         elif postman_notebook_request:
-            return jsonify({'message': 'Already logged in'})
+            userData = userModel.User.query \
+                .filter_by(id=user) \
+                .first()
+            resp = make_response(jsonify({"access_token": userData.access_token, "refresh_token": userData.refresh_token}))
+            resp.set_cookie('access_token_cookie', userData.access_token)
+            resp.set_cookie('refresh_token_cookie', userData.refresh_token)
+            return resp
 
     asset_registry = False
     # this will run if website form request
@@ -143,14 +149,18 @@ def login():
             .filter_by(email=email) \
             .first()
         if not user:
-            msg = 'You are not registered'
-            flash(message=msg, category='danger')
+            msg = 'Invalid email or password.'
+            if postman_notebook_request:
+                return jsonify({'message': msg})
+            else:
+                flash(message=msg, category='danger')
+                return redirect(app.config['DEVELOPMENT_BASE_URL'])
         elif is_blacklisted(email):
             msg = f'"{email}" is blacklisted'
             flash(message=msg, category='danger')
 
         # set global flag for user activation accordingly
-        if not user.activated:
+        if user and not user.activated:
             app.is_user_activated = False
         else:
             app.is_user_activated = True
