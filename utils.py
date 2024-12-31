@@ -132,10 +132,21 @@ def get_fields_count_by_domain(authority_tokens_list):
 
 def check_non_web_user_agent(user_agent):
     """
-    Check if the request is either from Postman or Notebook
+    Check if the request is either from Postman, Notebook, or a mobile device.
     """
     try:
-        return 'Postman' in user_agent or 'python' in user_agent  # check if request from development user agents
+        # Convert user_agent to lowercase for case-insensitive comparison
+        user_agent = user_agent.lower()
+        # Check for development user agents or mobile device user agents
+        return (
+                'postman' in user_agent or
+                'python' in user_agent or
+                'android' in user_agent or
+                'iphone' in user_agent or
+                'ipad' in user_agent or
+                'mobile' in user_agent or
+                'dart' in user_agent
+        )
     except Exception as e:
         raise e
 
