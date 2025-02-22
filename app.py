@@ -118,11 +118,40 @@ def login():
     app.config["WTF_CSRF_ENABLED"] = False
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+
+    # Detect if the request is from a mobile device
+    is_mobile = "Mobile" in user_agent or "Android" in user_agent or "iPhone" in user_agent
+    device_id = request.headers.get('X-DEVICE-ID') if is_mobile else None
+
+    # First, check if user is already logged in using JWT
     user = get_identity_if_logedin()
+
+    # If no logged-in user but `device_id` is present, try logging in via device_id
+    if not user and device_id:
+        user = userModel.User.query.filter_by(device_id=device_id).first()
+        if user:
+            # Generate JWT Tokens
+            additional_claims = {"domain": "mobile_login", "is_activated": user.activated}
+            access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
+            refresh_token = create_refresh_token(identity=user.id)
+
+            # Store tokens in user model
+            user.access_token = access_token
+            user.refresh_token = refresh_token
+            db.session.commit()
+
+            # Return response similar to Postman requests
+            resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
+            resp.set_cookie('access_token_cookie', access_token)
+            resp.set_cookie('refresh_token_cookie', refresh_token)
+            return resp
+        else:
+            return jsonify({"message": "Invalid Device ID"}), 400
+
     if user:
         if not postman_notebook_request:
             return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
-        elif postman_notebook_request:
+        elif postman_notebook_request or (is_mobile and device_id):
             userData = userModel.User.query \
                 .filter_by(id=user) \
                 .first()
@@ -211,6 +240,37 @@ def signup():
     app.config["WTF_CSRF_ENABLED"] = False
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+    device_id = request.headers.get('X-DEVICE-ID')  # Identify mobile request
+
+    # If device_id is present, skip form validation
+    if device_id:
+        # Check if user already exists with the same device_id
+        existing_user = userModel.User.query.filter_by(device_id=device_id).first()
+        if existing_user:
+            return jsonify({"message": "User already exists with this device ID"}), 400
+
+        # Automatically activate user
+        activated_on = datetime.datetime.now()
+
+        # Create user without requiring email, password, or phone number
+        new_user = userModel.User(
+            phone_num=None,
+            email=None,
+            password=None,
+            domain_id=1,  # Assign a default domain ID (modify as per your logic)
+            country=None,
+            lat_lng=None,
+            device_id=device_id,
+            activated=True,
+            activated_on=activated_on,
+        )
+
+        db.session.add(new_user)
+        db.session.commit()
+
+        return jsonify({"message": "User created successfully", "device_id": device_id}), 201
+
+
     form = SignupForm()
     if form.validate_on_submit():
         # gets email and password
@@ -261,9 +321,11 @@ def signup():
                     email=email,
                     password=generate_password_hash(password),
                     domain_id=domain_id,
-                    activated_on=None,
                     country=country,
-                    lat_lng="{}, {}".format(p.y, p.x) if p else None
+                    lat_lng="{}, {}".format(p.y, p.x) if p else None,
+                    device_id=device_id,
+                    activated=False,
+                    activated_on=None,
                 )
                 # insert user
                 db.session.add(user)
