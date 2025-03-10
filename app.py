@@ -337,18 +337,18 @@ def signup():
                 send_email(user.email, subject, html)
                 msg = 'A confirmation email has been sent via email.'
                 if postman_notebook_request:
-                    return jsonify({"message": msg})
+                    return jsonify({"message": msg}), 201  # Created
                 else:
                     flash(msg, 'success')
                     return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
             else:
                 msg = 'A user with this email already exists'
                 if postman_notebook_request:
-                    return jsonify({"message": msg})
+                    return jsonify({"message": msg}), 409  # Conflict
                 else:
                     flash(message=Markup(f'A user with email "{email}" already exists. Please  <a href="/" '
                                          f'class="alert-link">login</a>!'), category='info')
-    return render_template('signup.html', form=form)
+    return render_template('signup.html', form=form), 200  # OK
 
 
 @app.route('/activate/<token>')
