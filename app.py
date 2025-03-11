@@ -119,8 +119,14 @@ def login():
     user_agent = request.headers.get('User-Agent')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
 
-    # Detect if the request is from a mobile device
-    is_mobile = "Mobile" in user_agent or "Android" in user_agent or "iPhone" in user_agent
+   # More comprehensive mobile device detection
+    mobile_keywords = [
+        'mobile', 'android', 'iphone', 'ipad', 'ipod',
+        'blackberry', 'windows phone', 'opera mini',
+        'samsung', 'huawei', 'xiaomi', 'oppo', 'vivo'
+    ]
+    is_mobile = any(keyword in user_agent.lower()
+                    for keyword in mobile_keywords)
     device_id = request.headers.get('X-DEVICE-ID') if is_mobile else None
 
     # First, check if user is already logged in using JWT
