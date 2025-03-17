@@ -1,6 +1,8 @@
 from dbms import db
 import enum
 from sqlalchemy_utils import ChoiceType
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 
 
 class ListType(enum.Enum):
@@ -10,7 +12,7 @@ class ListType(enum.Enum):
 
 class DomainCheck(db.Model):
     __tablename__ = 'domaincheck'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     belongs_to = db.Column(ChoiceType(ListType, impl=db.String()))
     domain = db.Column(db.String())
     authority_token = db.Column(db.String(16), nullable=True)
