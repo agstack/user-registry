@@ -274,7 +274,12 @@ def signup():
         db.session.add(new_user)
         db.session.commit()
 
-        return jsonify({"message": "User created successfully", "device_id": device_id}), 201
+        # Return the user's UUID along with the success message
+        return jsonify({
+            "message": "User created successfully", 
+            "device_id": device_id,
+            "user_id": str(new_user.id)
+        }), 201
 
 
     form = SignupForm()
@@ -343,7 +348,10 @@ def signup():
                 send_email(user.email, subject, html)
                 msg = 'A confirmation email has been sent via email.'
                 if postman_notebook_request:
-                    return jsonify({"message": msg}), 201  # Created
+                    return jsonify({
+                        "message": msg,
+                        "user_id": str(user.id)
+                    }), 201  # Created
                 else:
                     flash(msg, 'success')
                     return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
