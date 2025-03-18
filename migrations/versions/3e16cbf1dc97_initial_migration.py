@@ -40,7 +40,7 @@ def upgrade():
     sa.Column('email', sa.String(), nullable=True),
     sa.Column('password', sa.String(), nullable=True),
     sa.Column('discoverable', sa.Boolean(), nullable=True),
-    sa.Column('domain_id', UUID(), nullable=False),
+    sa.Column('domain_id', UUID(), nullable=True),
     sa.ForeignKeyConstraint(['domain_id'], ['domaincheck.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

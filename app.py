@@ -263,7 +263,6 @@ def signup():
             phone_num=None,
             email=None,
             password=None,
-            domain_id=1,  # Assign a default domain ID (modify as per your logic)
             country=None,
             lat_lng=None,
             device_id=device_id,
@@ -331,12 +330,12 @@ def signup():
                     phone_num=phone_num,
                     email=email,
                     password=generate_password_hash(password),
-                    domain_id=domain_id,
                     country=country,
                     lat_lng="{}, {}".format(p.y, p.x) if p else None,
                     device_id=device_id,
                     activated=False,
                     activated_on=None,
+                    domain_id=domain_id,
                 )
                 # insert user
                 db.session.add(user)
