@@ -348,7 +348,7 @@ def signup():
                     confirm_url = url_for('activate_email', token=token, _external=True)
                     html = render_template('activation-email.html', confirm_url=confirm_url)
                     subject = "Please confirm your email"
-                    send_email(user.email, subject, html)
+                    # send_email(user.email, subject, html)
                     msg = 'A confirmation email has been sent via email.'
                     if postman_notebook_request:
                         return jsonify({
