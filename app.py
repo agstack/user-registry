@@ -137,7 +137,7 @@ def login():
         user = userModel.User.query.filter_by(device_id=device_id).first()
         if user:
             # Generate JWT Tokens
-            additional_claims = {"domain": "mobile_login", "is_activated": user.activated}
+            additional_claims = {"domain": "mobile_login", "is_activated": user.activated, "uuid": f"{user.id}"}
             access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
             refresh_token = create_refresh_token(identity=user.id)
 
@@ -202,7 +202,7 @@ def login():
 
         if check_password_hash(user.password, password):
             # generates the JWT Token
-            additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated}
+            additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated, "uuid": f"{user.id}"}
             access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
             refresh_token = create_refresh_token(identity=user.id)
             tokens = {'Authorization': 'Bearer ' + access_token, 'X-Refresh-Token': refresh_token}
