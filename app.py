@@ -293,6 +293,11 @@ def signup():
             password = form.password.data
             phone_num = form.phone_num.data
             discoverable = form.discoverable.data
+            
+            # Set discoverable to False if lat/lng not provided
+            if discoverable and (not form.lat.data or not form.lng.data):
+                discoverable = False
+                
             token_or_allowed = allowed_to_register(email)
             if not token_or_allowed:
                 msg = 'This email is blacklisted'
