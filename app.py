@@ -147,7 +147,7 @@ def login():
             db.session.commit()
 
             # Return response similar to Postman requests
-            resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
+            resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}), 200)
             resp.set_cookie('access_token_cookie', access_token)
             resp.set_cookie('refresh_token_cookie', refresh_token)
             return resp
@@ -156,12 +156,12 @@ def login():
 
     if user:
         if not postman_notebook_request:
-            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'), 302
         elif postman_notebook_request or (is_mobile and device_id):
             userData = userModel.User.query \
                 .filter_by(id=user) \
                 .first()
-            resp = make_response(jsonify({"access_token": userData.access_token, "refresh_token": userData.refresh_token}))
+            resp = make_response(jsonify({"access_token": userData.access_token, "refresh_token": userData.refresh_token}), 200)
             resp.set_cookie('access_token_cookie', userData.access_token)
             resp.set_cookie('refresh_token_cookie', userData.refresh_token)
             return resp
@@ -186,13 +186,15 @@ def login():
         if not user:
             msg = 'Invalid email or password.'
             if postman_notebook_request:
-                return jsonify({'message': msg})
+                return jsonify({'message': msg}), 401
             else:
                 flash(message=msg, category='danger')
-                return redirect(app.config['DEVELOPMENT_BASE_URL'])
+                return redirect(app.config['DEVELOPMENT_BASE_URL']), 302
         elif is_blacklisted(email):
             msg = f'"{email}" is blacklisted'
             flash(message=msg, category='danger')
+            if postman_notebook_request:
+                return jsonify({'message': msg}), 403
 
         # set global flag for user activation accordingly
         if user and not user.activated:
@@ -215,16 +217,16 @@ def login():
                         'error': f'{e}'
                     }), 400
             if not asset_registry and next_url != 'None':
-                resp = make_response(redirect(next_url))
+                resp = make_response(redirect(next_url), 302)
             elif not asset_registry:
-                resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'))
+                resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'), 302)
             else:
-                resp = make_response(jsonify({'access_token': access_token, 'refresh_token': refresh_token}))
+                resp = make_response(jsonify({'access_token': access_token, 'refresh_token': refresh_token}), 200)
             user.access_token = access_token
             user.refresh_token = refresh_token
             db.session.commit()
             if not asset_registry and postman_notebook_request:
-                resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}))
+                resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}), 200)
                 resp.set_cookie('access_token_cookie', access_token)
                 resp.set_cookie('refresh_token_cookie', refresh_token)
                 return resp
@@ -234,9 +236,11 @@ def login():
         else:
             msg = 'Incorrect Password!'
             flash(message=msg, category='danger')
+            if postman_notebook_request:
+                return jsonify({'message': msg}), 401
     if postman_notebook_request:
-        return jsonify({"message": msg})
-    return render_template('login.html', form=form)
+        return jsonify({"message": "Invalid request or missing credentials"}), 400
+    return render_template('login.html', form=form), 200
 
 
 @app.route('/signup', methods=['GET', 'POST'])
