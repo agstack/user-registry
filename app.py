@@ -111,42 +111,48 @@ def expired_token_callback(callback, callback2):
     return resp
 
 
+# Health check endpoint to verify the Flask app is running
+@app.route('/health', methods=['GET'])
+def health_check():
+    resp = jsonify({"status": "OK", "message": "Flask app is running"})
+    # Allow health check to be accessed from any origin
+    if 'Origin' in request.headers:
+        resp.headers['Access-Control-Allow-Origin'] = request.headers['Origin']
+        resp.headers['Access-Control-Allow-Credentials'] = 'true'
+    return resp, 200
+
 @app.route('/', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])
 @jwt_required(optional=True)
 @csrf.exempt
 def login():
     app.config["WTF_CSRF_ENABLED"] = False
-    user_agent = request.headers.get('User-Agent')
+    user_agent = request.headers.get('User-Agent', '')
     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
 
-   # More comprehensive mobile device detection
+    # Basic mobile detection
     mobile_keywords = [
         'mobile', 'android', 'iphone', 'ipad', 'ipod',
         'blackberry', 'windows phone', 'opera mini',
         'samsung', 'huawei', 'xiaomi', 'oppo', 'vivo'
     ]
-    is_mobile = any(keyword in user_agent.lower()
-                    for keyword in mobile_keywords)
+    is_mobile = any(keyword in user_agent.lower() for keyword in mobile_keywords)
     device_id = request.headers.get('X-DEVICE-ID') if is_mobile else None
 
-    # First, check if user is already logged in using JWT
     user = get_identity_if_logedin()
 
-    # If no logged-in user but `device_id` is present, try logging in via device_id
+    # Mobile login via device ID
     if not user and device_id:
         user = userModel.User.query.filter_by(device_id=device_id).first()
         if user:
-            # Generate JWT Tokens
-            additional_claims = {"domain": "mobile_login", "is_activated": user.activated, "uuid": f"{user.id}"}
+            additional_claims = {"domain": "mobile_login", "is_activated": user.activated, "uuid": str(user.id)}
             access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
             refresh_token = create_refresh_token(identity=user.id)
 
-            # Store tokens in user model
             user.access_token = access_token
             user.refresh_token = refresh_token
             db.session.commit()
 
-            # Return response similar to Postman requests
             resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}), 200)
             resp.set_cookie('access_token_cookie', access_token)
             resp.set_cookie('refresh_token_cookie', refresh_token)
@@ -154,93 +160,100 @@ def login():
         else:
             return jsonify({"message": "Invalid Device ID"}), 400
 
+    # User already logged in
     if user:
         if not postman_notebook_request:
-            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'), 302
-        elif postman_notebook_request or (is_mobile and device_id):
-            userData = userModel.User.query \
-                .filter_by(id=user) \
-                .first()
-            resp = make_response(jsonify({"access_token": userData.access_token, "refresh_token": userData.refresh_token}), 200)
-            resp.set_cookie('access_token_cookie', userData.access_token)
-            resp.set_cookie('refresh_token_cookie', userData.refresh_token)
-            return resp
+            return redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home')
+        else:
+            userData = userModel.User.query.get(user)
+            return jsonify({
+                "access_token": userData.access_token,
+                "refresh_token": userData.refresh_token
+            }), 200
 
-    asset_registry = False
-    # this will run if website form request
+    # Form or header-based login
     form = LoginForm()
-    # next url for redirecting after login
-    next_url = form.next.data
-    if request.headers.get('X-ASSET-REGISTRY') == 'True':
-        asset_registry = True
+    next_url = form.next.data or request.args.get('next') or None
+
+    asset_registry = request.headers.get('X-ASSET-REGISTRY') == 'True'
+    email = None
+    password = None
+
+    if asset_registry:
         email = request.headers.get('X-EMAIL')
         password = request.headers.get('X-PASSWORD')
     elif form.validate_on_submit():
         email = form.email.data
         password = form.password.data
 
-    if not asset_registry and form.validate_on_submit() or asset_registry:
-        user = userModel.User.query \
-            .filter_by(email=email) \
-            .first()
+    if (form.validate_on_submit() and not asset_registry) or asset_registry:
+        user = userModel.User.query.filter_by(email=email).first()
         if not user:
             msg = 'Invalid email or password.'
             if postman_notebook_request:
                 return jsonify({'message': msg}), 401
-            else:
-                flash(message=msg, category='danger')
-                return redirect(app.config['DEVELOPMENT_BASE_URL']), 302
-        elif is_blacklisted(email):
+            flash(msg, 'danger')
+            return redirect(app.config['DEVELOPMENT_BASE_URL'])
+
+        if is_blacklisted(email):
             msg = f'"{email}" is blacklisted'
-            flash(message=msg, category='danger')
             if postman_notebook_request:
                 return jsonify({'message': msg}), 403
+            flash(msg, 'danger')
+            return redirect(app.config['DEVELOPMENT_BASE_URL'])
 
-        # set global flag for user activation accordingly
-        if user and not user.activated:
-            app.is_user_activated = False
-        else:
-            app.is_user_activated = True
+        app.is_user_activated = user.activated
 
         if check_password_hash(user.password, password):
-            # generates the JWT Token
-            additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated, "uuid": f"{user.id}"}
+            additional_claims = {"domain": email.split('@')[1], "is_activated": user.activated, "uuid": str(user.id)}
             access_token = create_access_token(identity=user.id, additional_claims=additional_claims)
             refresh_token = create_refresh_token(identity=user.id)
-            tokens = {'Authorization': 'Bearer ' + access_token, 'X-Refresh-Token': refresh_token}
+
             if not asset_registry:
                 try:
+                    tokens = {'Authorization': 'Bearer ' + access_token, 'X-Refresh-Token': refresh_token}
                     requests.get(app.config['ASSET_REGISTRY_BASE_URL'], headers=tokens)
                 except Exception as e:
-                    return jsonify({
-                        'message': 'Fetch Session Cookies Error!',
-                        'error': f'{e}'
-                    }), 400
-            if not asset_registry and next_url != 'None':
-                resp = make_response(redirect(next_url), 302)
-            elif not asset_registry:
-                resp = make_response(redirect(app.config['DEVELOPMENT_BASE_URL'] + '/home'), 302)
-            else:
-                resp = make_response(jsonify({'access_token': access_token, 'refresh_token': refresh_token}), 200)
+                    return jsonify({'message': 'Fetch Session Cookies Error!', 'error': str(e)}), 400
+
             user.access_token = access_token
             user.refresh_token = refresh_token
             db.session.commit()
-            if not asset_registry and postman_notebook_request:
-                resp = make_response(jsonify({"access_token": access_token, "refresh_token": refresh_token}), 200)
-                resp.set_cookie('access_token_cookie', access_token)
-                resp.set_cookie('refresh_token_cookie', refresh_token)
-                return resp
+
+            # If API client (Postman, mobile, scripts), return JSON
+            if postman_notebook_request or request.is_json or 'application/json' in request.headers.get('Accept', ''):
+                return jsonify({
+                    "access_token": access_token,
+                    "refresh_token": refresh_token
+                }), 200
+
+            # Else treat as browser and redirect
+            default_redirect_url = app.config.get('DEVELOPMENT_BASE_URL', '') + '/home'
+            if not default_redirect_url:
+                default_redirect_url = '/home'  # fallback just in case
+
+            if next_url and isinstance(next_url, str) and next_url.lower() != 'none':
+                resp = make_response(redirect(next_url))
+            else:
+                resp = make_response(redirect(default_redirect_url))
+
+
             resp.set_cookie('access_token_cookie', access_token)
             resp.set_cookie('refresh_token_cookie', refresh_token)
             return resp
+
         else:
             msg = 'Incorrect Password!'
-            flash(message=msg, category='danger')
             if postman_notebook_request:
                 return jsonify({'message': msg}), 401
+            flash(msg, 'danger')
+
+    # Default fallback
     if postman_notebook_request:
         return jsonify({"message": "Invalid request or missing credentials"}), 400
-    return render_template('login.html', form=form), 200
+
+    return render_template('login.html', form=form)
+
 
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -576,7 +589,7 @@ def update():
         }), 401
 
 
-@app.route('/logout', methods=["GET"])
+@app.route('/logout', methods=["GET","POST"])
 @jwt_required(refresh=True)
 @csrf.exempt
 def logout():
@@ -661,11 +674,12 @@ def authorize_a_domain():
             return make_response(jsonify({
                 "message": "Domain already authorized."
             }), 200)
-        issue_auth_token(domain)
-        return jsonify({
-            "Message": "Domain Authorized",
-            "Domain": domain.domain
-        }), 200
+        else:
+            issue_auth_token(domain)
+            return jsonify({
+                "Message": "Domain Authorized",
+                "Domain": domain.domain
+            }), 200
     except Exception as e:
         return jsonify({
             'message': 'Authorizing Domain Error',

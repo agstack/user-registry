@@ -11,8 +11,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+from datetime import timedelta
+app.url_map.strict_slashes = False  # Disable trailing slash redirects new added
 CORS(app)
-csrf = CSRFProtect(app)
+
+csrf = CSRFProtect()
+csrf.init_app(app)
 app.is_user_activated = False  # global flag to check if user is activated
 
 # Email config settings

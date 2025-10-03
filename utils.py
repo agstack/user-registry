@@ -9,6 +9,10 @@ from dbms import db, app
 from sqlalchemy import func
 from datetime import date, timedelta
 from flask_jwt_extended import create_access_token
+import hashlib
+import secrets
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 
 
 # function for validating an Email
@@ -56,17 +60,37 @@ def allowed_to_register(email):
             .filter_by(domain=domain).first().id
 
 
+ 
+def generate_domain_token(domain_string):
+    normalized_domain = domain_string.lower().strip()
+    m = hashlib.sha256()
+    m.update(normalized_domain.encode("utf-8"))
+    return m.hexdigest()
+
+
 def issue_auth_token(domain):
     """
-    This function takes in a domain and issues a unique authority token for that domain
+    This function takes in a domain object and issues a unique authority token
     """
-    token = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-    while domainCheck.DomainCheck.query.filter_by(authority_token=token).first() is not None:
-        token = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-    domain.authority_token = token
-    domain.belongs_to = "0"
-    db.session.add(domain)
-    db.session.commit()
+    token = generate_domain_token(domain.domain)
+    print(f"Token for {domain.domain}: {token}")
+
+    if domainCheck.DomainCheck.query.filter_by(authority_token=token).first() is None:
+        try:
+            domain.authority_token = token
+            domain.belongs_to = "0"
+            db.session.commit()
+            print("Authority token successfully issued.")
+            return True
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            print(f"Database error: {e}")
+            return False
+    else:
+        print("Token already in use.")
+        return False
+    
+    
 
 
 def get_row_count_by_month():
@@ -187,3 +211,5 @@ def generate_secret_key(client_secret=False):
         return secret_key
     except Exception as e:
         raise e
+    
+    

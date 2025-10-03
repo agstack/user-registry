@@ -1,9 +1,7 @@
 import os
 from dotenv import load_dotenv
-
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv()
-
 
 class Config(object):
     SECRET_KEY = 'user_registry_secret_key'
@@ -14,7 +12,7 @@ class Config(object):
     SECRET_KEY = os.getenv('SECRET_KEY')
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
     ASSET_REGISTRY_BASE_URL = os.getenv('ASSET_REGISTRY_BASE_URL')
-    ASSET_REGISTRY_BASE_URL_FE = os.getenv('ASSET_REGISTRY_BASE_URL_FE')
+    ASSET_REGISTRY_BASE_URL_FE = os.getenv('ASSET_REGISTRY_BASE_URL_FE')  # Removed the extra 's'
 
     # mail settings
     MAIL_SERVER = 'smtp.gmail.com'
