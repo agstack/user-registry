@@ -465,25 +465,41 @@ def user_lookup_callback(_jwt_header, jwt_data):
     return userModel.User.query.filter_by(id=identity).one_or_none()
 
 
+# @app.route("/refresh", methods=["GET"])
+# @jwt_required(refresh=True)
+# @csrf.exempt
+# def refresh():
+#     """
+#     We are using the `refresh=True` options in jwt_required to only allow
+#     refresh tokens to access this route.
+#     """
+#     user_agent = request.headers.get('User-Agent')
+#     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+#     identity = get_jwt_identity()
+#     access_token = create_access_token(identity=identity)
+#     if postman_notebook_request:
+#         resp = make_response(jsonify({"access token": access_token}))
+#     else:
+#         resp = make_response(redirect(request.referrer))
+#     user = userModel.User.query.filter_by(id=current_user.id).first()
+#     user.access_token = access_token
+#     db.session.commit()
+#     set_access_cookies(resp, access_token)
+#     return resp
+
+@csrf.exempt
 @app.route("/refresh", methods=["GET"])
 @jwt_required(refresh=True)
-@csrf.exempt
 def refresh():
-    """
-    We are using the `refresh=True` options in jwt_required to only allow
-    refresh tokens to access this route.
-    """
     user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
-    if postman_notebook_request:
-        resp = make_response(jsonify({"access token": access_token}))
-    else:
-        resp = make_response(redirect(request.referrer))
+ 
     user = userModel.User.query.filter_by(id=current_user.id).first()
     user.access_token = access_token
     db.session.commit()
+ 
+    resp = make_response(jsonify({"access_token": access_token}))
     set_access_cookies(resp, access_token)
     return resp
 
