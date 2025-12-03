@@ -11,7 +11,7 @@ Flask database models are used to create and store user registry data. The main 
 A table containing the following user information:
 
 * `id`: Unique user ID. **Required**
-* `phone_number`: User phone number. **Optional**
+* `phone_number`: User phone number. **Required**
 * `email`: User email address. **Required**
 * `password`: Hashed password for authentication. **Required**
 * `token_required`: Unique access token generated when the user is created.
@@ -71,7 +71,7 @@ Access tokens have a short lifespan for security. When expired, protected endpoi
 
 ```json
 {
-  "message": "Invalid token: Signature has expired"
+  "message": "Invalid token: Short live token has expired"
 }
 ```
 
@@ -103,7 +103,7 @@ If you attempt an authenticated request with an expired access token, you may re
 
 ```json
 {
-  "message": "Invalid token: Signature has expired"
+  "message": "Invalid token: Short live token has expired"
 }
 ```
 
