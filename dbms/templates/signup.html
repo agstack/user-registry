@@ -40,7 +40,7 @@
 
     <div class="form-outline mb-4 text-start">
         {{ form.phone_num.label(class_="form-label ms-1") }}
-        {{ form.phone_num(class_="form-control", placeholder_="921234567890") }}
+        {{ form.phone_num(class_="form-control", placeholder_="+1 9212345678") }}
      {% if form.phone_num.errors %}
     <ul>
         {% for error in form.phone_num.errors %}

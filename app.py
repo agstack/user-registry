@@ -27,6 +27,7 @@ from utils_activation.email import send_email
 from utils_activation.token import generate_confirmation_token, confirm_token
 from utils import issue_auth_token
 from dbms.models import user, blackList, domainCheck
+import phonenumbers
 
 migrate = Migrate(app, db)
 
@@ -255,7 +256,187 @@ def login():
     return render_template('login.html', form=form)
 
 
+# new working code with phone numbers validation
+@app.route('/signup', methods=['GET', 'POST'])
+@jwt_required(optional=True)
+@csrf.exempt
+def signup():
+    try:
+        app.config["WTF_CSRF_ENABLED"] = False
+        user_agent = request.headers.get('User-Agent')
+        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+        device_id = request.headers.get('X-DEVICE-ID') 
 
+        if device_id:
+            # Check if user already exists with the same device_id
+            existing_user = userModel.User.query.filter_by(device_id=device_id).first()
+            if existing_user:
+                return jsonify({"message": "User already exists with this device ID"}), 400
+
+            # Automatically activate user
+            activated_on = datetime.datetime.now()
+
+            # Create user without requiring email, password, or phone number
+            new_user = userModel.User(
+                phone_num=None,
+                email=None,
+                password=None,
+                country=None,
+                lat_lng=None,
+                device_id=device_id,
+                activated=True,
+                activated_on=activated_on,
+            )
+
+            db.session.add(new_user)
+            db.session.commit()
+
+            # Return the user's UUID along with the success message
+            return jsonify({
+                "message": "User created successfully", 
+                "device_id": device_id,
+                "user_id": str(new_user.id)
+            }), 201
+
+
+        form = SignupForm()
+        if form.validate_on_submit():
+            email = form.email.data
+            password = form.password.data
+            phone_num = form.phone_num.data
+            discoverable = form.discoverable.data
+
+            # phone number validation start
+            
+            # 1. check if phone number is given or not
+            if not phone_num:
+                msg = 'Phone number is required.'
+                if postman_notebook_request:
+                    return jsonify({"message": msg}), 400
+                else:
+                    flash(msg, 'danger')
+                    return render_template('signup.html', form=form), 400
+
+            # 2. validate phone number
+            try:
+                # Parse the number. 'None' implies we expect the number to contain the country code (starts with +)
+                parsed_num = phonenumbers.parse(phone_num, None)
+                
+                # check 1: is it a valid format?
+                # check 2: is the country code real?
+                if not phonenumbers.is_valid_number(parsed_num):
+                    msg = 'Invalid phone number. Please check the country code and length.'
+                    if postman_notebook_request:
+                        return jsonify({"message": msg}), 400
+                    else:
+                        flash(msg, 'danger')
+                        return render_template('signup.html', form=form), 400
+    
+                phone_num = phonenumbers.format_number(parsed_num, phonenumbers.PhoneNumberFormat.E164)
+
+            except phonenumbers.NumberParseException:
+                msg = 'Invalid format. Phone number must start with + followed by country code (e.g., +1 234 567 8900).'
+                if postman_notebook_request:
+                    return jsonify({"message": msg}), 400
+                else:
+                    flash(msg, 'danger')
+                    return render_template('signup.html', form=form), 400
+            
+            # phone number validation end
+
+            # Set discoverable to False if lat/lng not provided
+            if discoverable and (not form.lat.data or not form.lng.data):
+                discoverable = False
+                
+            token_or_allowed = allowed_to_register(email)
+            if not token_or_allowed:
+                msg = 'This email is blacklisted'
+                if postman_notebook_request:
+                    return jsonify({"message": msg})
+                else:
+                    flash(message=msg, category='danger')
+            else:
+                domain_id = token_or_allowed
+
+                # checking for existing user
+                user = userModel.User.query \
+                    .filter_by(email=email) \
+                    .first()
+                if not user:
+                    country = ''
+                    p = None
+                    if discoverable:
+                        lat = form.lat.data
+                        lng = form.lng.data
+                        if not lat or not lng:
+                            msg = 'Allow Access to Location to be Discoverable.'
+                            flash(message=msg, category='danger')
+                            if postman_notebook_request:
+                                return jsonify({"message": msg}), 400
+                            else:
+                                return render_template('signup.html', form=form), 400
+                        
+                        worldShpFile = app.static_folder + '/99bfd9e7-bb42-4728-87b5-07f8c8ac631c2020328-1-1vef4ev.lu5nk.shp'
+                        wrs_gdf = gpd.read_file(worldShpFile)
+                        wrs_gdf = wrs_gdf.to_crs(4326)
+                        p = Point([lng, lat])
+                        try:
+                            country = wrs_gdf[wrs_gdf.contains(p)].reset_index(drop=True).CNTRY_NAME.iloc[0]
+                        except Exception as e:
+                            country = ''
+                    
+                    if domain_id and hasattr(domain_id, 'hex'):
+                        domain_id = str(domain_id)
+
+                    user = userModel.User(
+                        phone_num=phone_num,
+                        email=email,
+                        password=generate_password_hash(password),
+                        country=country,
+                        lat_lng="{}, {}".format(p.y, p.x) if p else None,
+                        device_id=device_id,
+                        activated=False,
+                        activated_on=None,
+                        domain_id=domain_id,
+                    )
+                    
+                    db.session.add(user)
+                    db.session.commit()
+                    token = generate_confirmation_token(user.email)
+                    confirm_url = url_for('activate_email', token=token, _external=True)
+                    html = render_template('activation-email.html', confirm_url=confirm_url)
+                    subject = "Please confirm your email"
+                    send_email(user.email, subject, html)
+                    msg = 'A confirmation email has been sent via email.'
+                    if postman_notebook_request:
+                        return jsonify({
+                            "message": msg,
+                            "user_id": str(user.id)
+                        }), 201 
+                    else:
+                        flash(msg, 'success')
+                        return make_response(redirect(app.config['DEVELOPMENT_BASE_URL']))
+                else:
+                    msg = 'A user with this email already exists'
+                    if postman_notebook_request:
+                        return jsonify({"message": msg}), 409 
+                    else:
+                        flash(message=Markup(f'A user with email "{email}" already exists. Please  <a href="/" '
+                                            f'class="alert-link">login</a>!'), category='info')
+        return render_template('signup.html', form=form), 200 
+    except Exception as e:
+        print(f"Signup Error: {str(e)}")
+        if postman_notebook_request:
+            return jsonify({
+                'message': 'Signup Error',
+                'error': f'{e}'
+            }), 500
+        else:
+            flash(message='An error occurred during signup. Please try again.', category='danger')
+            return render_template('signup.html', form=form if 'form' in locals() else SignupForm()), 500
+
+"""
+# old working code
 @app.route('/signup', methods=['GET', 'POST'])
 @jwt_required(optional=True)
 @csrf.exempt
@@ -401,6 +582,7 @@ def signup():
         else:
             flash(message='An error occurred during signup. Please try again.', category='danger')
             return render_template('signup.html', form=form if 'form' in locals() else SignupForm()), 500
+"""
 
 @app.route('/activate/<token>')
 @jwt_required()
@@ -491,16 +673,26 @@ def user_lookup_callback(_jwt_header, jwt_data):
 @app.route("/refresh", methods=["GET"])
 @jwt_required(refresh=True)
 def refresh():
-    user_agent = request.headers.get('User-Agent')
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
- 
+    refresh_token = create_refresh_token(identity=identity)
+
     user = userModel.User.query.filter_by(id=current_user.id).first()
     user.access_token = access_token
     db.session.commit()
- 
+
     resp = make_response(jsonify({"access_token": access_token}))
+    # Set access token cookie (session or short-lived)
     set_access_cookies(resp, access_token)
+    # Set refresh token cookie with expiration (persistent)
+    resp.set_cookie(
+        "refresh_token_cookie",
+        refresh_token,
+        max_age=30 * 24 * 60 * 60,  # 30 days
+        httponly=True,
+        secure=True,
+        samesite="Lax"
+    )
     return resp
 
 
@@ -1028,4 +1220,4 @@ def generate_api_keys():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', port=5001 ,debug=True)
