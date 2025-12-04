@@ -36,11 +36,17 @@ class LoginForm(FlaskForm):
 
 class UpdateForm(FlaskForm):
     email = StringField('Email', validators=[Email(message='Please provide a valid email'), Optional()])
-    phone_num = StringField('Phone Number', validators=[Regexp("^[0-9]{6,16}", message='Please '
-                                                                                                       'provide a '
-                                                                                                       'valid phone '
-                                                                                                       'number (e.g. '
-                                                                                                       '921234567890)'), Optional()])
+    # phone_num = StringField('Phone Number', validators=[Regexp("^[0-9]{6,16}", message='Please '
+    #                                                                                                    'provide a '
+    #                                                                                                    'valid phone '
+    #                                                                                                    'number (e.g. '
+    #                                                                                                    '921234567890)'), Optional()])
+
+    phone_num = StringField('Phone Number', validators=[
+        Regexp(r"^\+?[\d\s-]{8,20}$", message='Please provide a valid phone number with Country Code (e.g. +1 555 123 4567)'),
+        Optional()
+    ])
+    
     password = PasswordField('New Password',
                              validators=[Regexp("^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,}",
                                                                 message="Please follow the guidelines for a strong password"), Optional()])

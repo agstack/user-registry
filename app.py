@@ -770,6 +770,136 @@ def update():
                 msg = "Password changed"
                 json_msg = json_msg + ". " + msg
                 flash(message=msg, category='info')
+            
+            # phone number validation start
+            if phone_num != "" and phone_num != current_user.phone_num:
+                try:
+                    parsed_num = phonenumbers.parse(phone_num, None)
+                    
+                    # check 1: is it a valid format?
+                    if not phonenumbers.is_valid_number(parsed_num):
+                        msg = 'Invalid phone number. Please check the country code and length.'
+                        if postman_notebook_request:
+                            return jsonify({"message": msg}), 400
+                        else:
+                            flash(msg, 'danger')
+                            return render_template('update.html', form=form), 400
+        
+                    # format number to E164 before saving
+                    phone_num = phonenumbers.format_number(parsed_num, phonenumbers.PhoneNumberFormat.E164)
+
+                    user_to_update.phone_num = phone_num
+                    msg = "Phone number updated"
+                    json_msg = json_msg + ". " + msg
+                    flash(message=msg, category='info')
+
+                except phonenumbers.NumberParseException:
+                    msg = 'Invalid format. Phone number must start with + followed by country code.'
+                    if postman_notebook_request:
+                        return jsonify({"message": msg}), 400
+                    else:
+                        flash(msg, 'danger')
+                        return render_template('update.html', form=form), 400
+                    
+            # phone number validation end 
+
+            if discoverable != current_user.discoverable:
+                user_to_update.discoverable = discoverable
+                msg = "Discoverable field updated"
+                json_msg = json_msg + ". " + msg
+                flash(message=msg, category='info')
+
+            db.session.commit()
+            if postman_notebook_request:
+                if json_msg != "" and json_msg[0] == ".":
+                    json_msg = json_msg[2:]
+                    return jsonify({"message": json_msg}), 202
+                return jsonify({'message': "Nothing to be updated"}), 200
+        if postman_notebook_request:
+            return jsonify({"message": "Form validation failed"}), 400
+        return render_template('update.html', form=form)
+    except Exception as e:
+        return jsonify({
+            'message': 'Update User Error',
+            'error': f'{e}'
+        }), 401
+    
+"""
+# Old working code
+@app.route('/update', methods=['GET', 'POST'])
+@jwt_required()
+@csrf.exempt
+def update():
+    try:
+        user_agent = request.headers.get('User-Agent')
+        postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+        app.config["WTF_CSRF_ENABLED"] = False
+        form = UpdateForm()
+        if form.email.data is None:
+            form.email.data = current_user.email
+        if form.phone_num.data is None:
+            form.phone_num.data = current_user.phone_num
+        if form.discoverable.data is None:
+            form.discoverable.data = current_user.discoverable
+        if form.password.data is None:
+            form.password.data = ""
+            form.confirm_pass.data = ""
+
+        if form.validate_on_submit():
+            # gets email and password
+            email = form.email.data
+            password = form.password.data
+            phone_num = form.phone_num.data
+            discoverable = form.discoverable.data
+            json_msg = ""
+            user_to_update = userModel.User.query.filter_by(email=current_user.email).first()
+            if email != "" and email != current_user.email:
+                token_or_allowed = allowed_to_register(email)
+                if not token_or_allowed:
+                    msg = 'This email is blacklisted'
+                    json_msg = json_msg + ". " + msg
+                    if postman_notebook_request:
+                        return jsonify({"message": json_msg})
+                    else:
+                        flash(message=msg, category='danger')
+                else:
+                    domain_id = token_or_allowed
+
+                    # checking for existing user
+                    user = userModel.User.query \
+                        .filter_by(email=email) \
+                        .first()
+                    if not user:
+                        user_to_update.email = email
+                        msg = "Email address updated"
+                        json_msg = json_msg + ". " + msg
+                        flash(message=msg, category='info')
+                        if current_user.domain_id != domain_id:
+                            user_to_update.domain_id = domain_id
+                            if domainCheck.DomainCheck.query.filter_by(
+                                    id=domain_id).first().belongs_to == domainCheck.DomainCheck.query.filter_by(
+                                id=current_user.domain_id).first().belongs_to:
+                                if domainCheck.DomainCheck.query.filter_by(
+                                        id=domain_id).first().belongs_to == domainCheck.ListType.authorized:
+                                    msg = "Added to authorized domain list"
+                                    json_msg = json_msg + ". " + msg
+                                    flash(message=msg, category='info')
+
+                                elif domainCheck.DomainCheck.query.filter_by(
+                                        id=domain_id).first().belongs_to == domainCheck.ListType.blocked_authority_list:
+                                    msg = "Removed from authorized domain list"
+                                    json_msg = json_msg + ". " + msg
+                                    flash(message=msg, category='warning')
+
+                    else:
+                        msg = f'A user with email "{email}" already exists.'
+                        json_msg = json_msg + ". " + msg
+                        flash(message=msg, category='info')
+            if password != "" and not check_password_hash(user_to_update.password, password):
+                user_to_update.password = generate_password_hash(password)
+                msg = "Password changed"
+                json_msg = json_msg + ". " + msg
+                flash(message=msg, category='info')
             if phone_num != "" and phone_num != current_user.phone_num:
                 user_to_update.phone_num = phone_num
                 msg = "Phone number updated"
@@ -795,7 +925,7 @@ def update():
             'message': 'Update User Error',
             'error': f'{e}'
         }), 401
-
+"""
 
 @app.route('/logout', methods=["GET","POST"])
 @jwt_required(refresh=True)
