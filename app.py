@@ -366,6 +366,37 @@ def signup():
                     # insert user
                     db.session.add(user)
                     db.session.commit()
+
+                                        # start save user in terrapipe also 
+                    terrapipe_payload = {
+                        'user_id': str(user.id),
+                        'email': user.email,
+                        'phone_num': user.phone_num,
+                        'password': password,
+                        'coordinates': {"lat": p.y, "lng": p.x} if p else None,
+                    }
+                    
+                    try:
+                        terrapipe_url = 'https://api.terrapipe.io/internal/user-sync'
+                        response = requests.post(
+                            terrapipe_url, 
+                            json=terrapipe_payload,
+                            timeout=60 
+                        )
+                        if response.status_code not in (200, 201):
+                            print(f"WARNING: Terrapipe sync failed with status {response.status_code}. Error: {response.text}")
+                        else:
+                            print(f"Terrapipe sync successful for user {user.id}")
+
+                    except requests.exceptions.Timeout:
+                        # if terrapipe failed log the failure but continue with Registry signup success
+                        print("WARNING: Terrapipe sync timed out.")
+                    except requests.exceptions.RequestException as e:
+                        # catch other connection errors
+                        print(f"WARNING: Terrapipe connection error: {e}")
+
+                    # end save user in terrapipe also 
+
                     token = generate_confirmation_token(user.email)
                     confirm_url = url_for('activate_email', token=token, _external=True)
                     html = render_template('activation-email.html', confirm_url=confirm_url)
@@ -465,26 +496,52 @@ def user_lookup_callback(_jwt_header, jwt_data):
     return userModel.User.query.filter_by(id=identity).one_or_none()
 
 
+# @app.route("/refresh", methods=["GET"])
+# @jwt_required(refresh=True)
+# @csrf.exempt
+# def refresh():
+#     """
+#     We are using the `refresh=True` options in jwt_required to only allow
+#     refresh tokens to access this route.
+#     """
+#     user_agent = request.headers.get('User-Agent')
+#     postman_notebook_request = utils.check_non_web_user_agent(user_agent)
+#     identity = get_jwt_identity()
+#     access_token = create_access_token(identity=identity)
+#     if postman_notebook_request:
+#         resp = make_response(jsonify({"access token": access_token}))
+#     else:
+#         resp = make_response(redirect(request.referrer))
+#     user = userModel.User.query.filter_by(id=current_user.id).first()
+#     user.access_token = access_token
+#     db.session.commit()
+#     set_access_cookies(resp, access_token)
+#     return resp
+
+@csrf.exempt
 @app.route("/refresh", methods=["GET"])
 @jwt_required(refresh=True)
-@csrf.exempt
 def refresh():
-    """
-    We are using the `refresh=True` options in jwt_required to only allow
-    refresh tokens to access this route.
-    """
-    user_agent = request.headers.get('User-Agent')
-    postman_notebook_request = utils.check_non_web_user_agent(user_agent)
     identity = get_jwt_identity()
     access_token = create_access_token(identity=identity)
-    if postman_notebook_request:
-        resp = make_response(jsonify({"access token": access_token}))
-    else:
-        resp = make_response(redirect(request.referrer))
+    refresh_token = create_refresh_token(identity=identity)
+
     user = userModel.User.query.filter_by(id=current_user.id).first()
     user.access_token = access_token
     db.session.commit()
+
+    resp = make_response(jsonify({"access_token": access_token}))
+    # Set access token cookie (session or short-lived)
     set_access_cookies(resp, access_token)
+    # Set refresh token cookie with expiration (persistent)
+    resp.set_cookie(
+        "refresh_token_cookie",
+        refresh_token,
+        max_age=30 * 24 * 60 * 60,  # 30 days
+        httponly=True,
+        secure=True,
+        samesite="Lax"
+    )
     return resp
 
 
